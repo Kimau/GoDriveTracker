@@ -23,35 +23,26 @@ import (
 
 // Flags
 var (
-	clientID     = flag.String("clientid", "", "OAuth 2.0 Client ID.  If non-empty, overrides --clientid_file")
-	clientIDFile = flag.String("clientid-file", "clientid.dat",
-		"Name of a file containing just the project's OAuth 2.0 Client ID from https://developers.google.com/console.")
-	secret     = flag.String("secret", "", "OAuth 2.0 Client Secret.  If non-empty, overrides --secret_file")
-	secretFile = flag.String("secret-file", "clientsecret.dat",
-		"Name of a file containing just the project's OAuth 2.0 Client Secret from https://developers.google.com/console.")
 	cacheToken = flag.Bool("cachetoken", true, "cache the OAuth 2.0 token")
 	debug      = flag.Bool("debug", false, "show HTTP traffic")
 )
 
-func usage() {
-	fmt.Fprintf(os.Stderr, "Usage: client <program> [args]\n\nPossible APIs:\n\n")
-	for n := range progFunc {
-		fmt.Fprintf(os.Stderr, "  * %s\n", n)
-	}
-	os.Exit(2)
+type ClientSecret struct {
+	Id     string `json:"client_id"`
+	Secret string `json:"client_secret"`
 }
 
 func main() {
 	flag.Parse()
-	if flag.NArg() == 0 {
-		usage()
-	}
+
+	// X
+	secret := loadClientSecret("_secret.json")
 
 	config := &oauth2.Config{
-		ClientID:     valueOrFileContents(*clientID, *clientIDFile),
-		ClientSecret: valueOrFileContents(*secret, *secretFile),
+		ClientID:     secret.ClientId,
+		ClientSecret: secret.ClientSecret,
 		Endpoint:     google.Endpoint,
-		Scopes:       []string{progScope[name]},
+		Scopes:       []string{urlshortener.UrlshortenerScope},
 	}
 
 	ctx := context.Background()
@@ -60,22 +51,25 @@ func main() {
 			Transport: &logTransport{http.DefaultTransport},
 		})
 	}
-	
+
 	c := newOAuthClient(ctx, config)
 	urlShortenerMain(c, flag.Args()[1:])
 }
 
-var (
-	progFunc  = make(map[string]func(*http.Client, []string))
-	progScope = make(map[string]string)
-)
-
-func registerProg(name, scope string, main func(c *http.Client, argv []string)) {
-	if progFunc[name] != nil {
-		panic(name + " already registered")
+func loadClientSecret(filename string) ClientSecret {
+	jsonBlob, err := ioutil.ReadFile(filename)
+	if err != nil {
+		log.Fatalln(err)
+		return
 	}
-	progFunc[name] = main
-	progScope[name] = scope
+
+	var cs ClientSecret
+	err = json.Unmarshal(jsonBlob, cs)
+	if err != nil {
+		log.Fatalln("Error in JSON ", err)
+	}
+
+	return cs
 }
 
 func tokenCacheFile(config *oauth2.Config) string {
