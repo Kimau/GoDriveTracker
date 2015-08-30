@@ -17,7 +17,7 @@ func urlShortenerMain(client *http.Client, urls []string) {
 		log.Fatalf("Unable to create UrlShortener service: %v", err)
 	}
 	
-	for(u := range(urls)) {
+	for _, u range urls {
 		// short -> long
 		if strings.HasPrefix(u, "http://goo.gl/") || strings.HasPrefix(u, "https://goo.gl/") {
 			url, err := svc.Url.Get(urlstr).Do()
