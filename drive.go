@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 
 	urlshortener "google.golang.org/api/urlshortener/v1"
@@ -20,7 +19,7 @@ func urlShortenerMain(client *http.Client, urls []string) {
 	for _, u := range urls {
 		// short -> long
 		if strings.HasPrefix(u, "http://goo.gl/") || strings.HasPrefix(u, "https://goo.gl/") {
-			url, err := svc.Url.Get(urlstr).Do()
+			url, err := svc.Url.Get(u).Do()
 			if err != nil {
 				log.Fatalf("URL Get: %v", err)
 			}
