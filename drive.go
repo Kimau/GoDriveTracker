@@ -21,6 +21,7 @@ var (
 
 func init() {
 	ClientScopes = append(ClientScopes, urlshortener.UrlshortenerScope, drive.DriveReadonlyScope)
+	commandFuncs["getSortDocList"] = GetSortDriveList
 }
 
 func setupClients(client *http.Client) {
@@ -112,14 +113,14 @@ func (a ByTypeThenModMeDesc) Less(i, j int) bool {
 			((a[i].ModifiedByMeDate == a[j].ModifiedByMeDate) && (a[i].ModifiedDate < a[j].ModifiedDate))))
 }
 
-func GetSortDriveList() {
+func GetSortDriveList() error {
 	var files []*drive.File
 	{
 		var err error
 		files, err = AllFiles("mimeType = 'application/vnd.google-apps.document'")
 		if err != nil {
 			log.Fatalln("Failed to get File List", err)
-			return
+			return err
 		}
 	}
 
@@ -138,11 +139,13 @@ func GetSortDriveList() {
 
 		if err != nil {
 			log.Fatalln("Failed to get File Revisions", err)
-			return
+			return err
 		}
 	}
 
 	for i, v := range revs {
 		fmt.Printf("%6d: \t[%s]\t[%s]\n", i, v.ModifiedDate, v.LastModifyingUserName)
 	}
+
+	return nil
 }

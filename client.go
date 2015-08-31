@@ -4,7 +4,6 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"hash/fnv"
 	"io/ioutil"
@@ -24,8 +23,6 @@ import (
 
 // Flags
 var (
-	cacheToken   = flag.Bool("cachetoken", true, "cache the OAuth 2.0 token")
-	debug        = flag.Bool("debug", false, "show HTTP traffic")
 	ClientScopes = []string{}
 )
 
@@ -34,14 +31,12 @@ type ClientSecret struct {
 	Secret string `json:"client_secret"`
 }
 
-func main() {
-	var err error
-	flag.Parse()
-
+func startClient() error {
 	// X
 	secret, err := loadClientSecret("_secret.json")
 	if err != nil {
 		log.Fatalln("Secret Missing: %s", err)
+		return nil
 	}
 
 	config := &oauth2.Config{
@@ -61,7 +56,7 @@ func main() {
 	c := newOAuthClient(ctx, config)
 	setupClients(c)
 
-	GetSortDriveList()
+	return nil
 }
 
 func loadClientSecret(filename string) (*ClientSecret, error) {
