@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"sync"
+	"time"
 
 	drive "google.golang.org/api/drive/v2"
 	urlshortener "google.golang.org/api/urlshortener/v1"
@@ -15,13 +17,17 @@ const (
 )
 
 var (
-	urlSvc *urlshortener.Service
-	drvSvc *drive.Service
+	urlSvc        *urlshortener.Service
+	drvSvc        *drive.Service
+	driveThrottle <-chan time.Time
 )
 
 func init() {
 	ClientScopes = append(ClientScopes, urlshortener.UrlshortenerScope, drive.DriveReadonlyScope)
-	commandFuncs["getSortDocList"] = GetSortDriveList
+	commandFuncs["doclist"] = GetSortDriveList
+
+	rate := time.Second / 10
+	driveThrottle = time.Tick(rate)
 }
 
 func setupClients(client *http.Client) {
@@ -63,6 +69,7 @@ func shortenUrl(longUrl string) *urlshortener.Url {
 
 // AllRevisions fetches all revisions for a given file
 func AllRevisions(fileId string) ([]*drive.Revision, error) {
+	<-driveThrottle // rate Limit
 	r, err := drvSvc.Revisions.List(fileId).Do()
 	if err != nil {
 		fmt.Printf("An error occurred: %v\n", err)
@@ -88,6 +95,8 @@ func AllFiles(query string) ([]*drive.File, error) {
 		if pageToken != "" {
 			q = q.PageToken(pageToken)
 		}
+
+		<-driveThrottle // rate Limit
 		r, err := q.Do()
 		if err != nil {
 			fmt.Printf("An error occurred: %v\n", err)
@@ -113,6 +122,21 @@ func (a ByTypeThenModMeDesc) Less(i, j int) bool {
 			((a[i].ModifiedByMeDate == a[j].ModifiedByMeDate) && (a[i].ModifiedDate < a[j].ModifiedDate))))
 }
 
+func GetFileRevsWriteDB(file *drive.File) error {
+	revLists, err := AllRevisions(file.Id)
+
+	for _, rev := range revLists {
+		go WriteRevision(file.Id, rev)
+	}
+
+	if err != nil {
+		log.Fatalln("Failed to get File Revisions", err)
+		return err
+	}
+
+	return nil
+}
+
 func GetSortDriveList() error {
 	var files []*drive.File
 	{
@@ -126,26 +150,19 @@ func GetSortDriveList() error {
 
 	sort.Sort(ByTypeThenModMeDesc(files))
 
-	for i, v := range files {
-		fmt.Printf("%6d: %s \t[%s]\t[%s]\n", i, v.Title, v.ModifiedByMeDate, v.ModifiedDate)
+	var wg sync.WaitGroup
+
+	for _, v := range files {
+		wg.Add(1)
+		go func(f *drive.File) {
+			WriteFile(f)
+			GetFileRevsWriteDB(f)
+			wg.Done()
+		}(v)
 	}
-
-	var revs []*drive.Revision
-
-	{
-		var err error
-		lastFile := files[len(files)-1]
-		revs, err = AllRevisions(lastFile.Id)
-
-		if err != nil {
-			log.Fatalln("Failed to get File Revisions", err)
-			return err
-		}
-	}
-
-	for i, v := range revs {
-		fmt.Printf("%6d: \t[%s]\t[%s]\n", i, v.ModifiedDate, v.LastModifyingUserName)
-	}
+	// Waiting on Writes
+	fmt.Println("Waiting on Web Requests...")
+	wg.Wait()
 
 	return nil
 }

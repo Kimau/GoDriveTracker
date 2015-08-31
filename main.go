@@ -46,7 +46,22 @@ func main() {
 	commandFuncs["clear"]()
 	flag.Parse()
 
+	if *debug {
+		log.Println("Debug Active")
+	}
+
 	startClient()
+	OpenDB("_data.db")
+
+	DumpDocListKeys()
+	LoadFileDumpStats("1-7VSRgGXb0mqvC75s6t2wuGWeeGfarDxivH5RR9VvSw")
+
+	commandLoop()
+
+	CloseDB()
+}
+
+func commandLoop() {
 	lines := scanForInput()
 
 	for {
@@ -62,6 +77,8 @@ func main() {
 				if err != nil {
 					log.Printf("Error [%s]: %s", line, err.Error())
 				}
+			} else if line == "quit" {
+				return
 			} else {
 				log.Printf("Unknown command: %s", line)
 				listCommands()
@@ -69,6 +86,7 @@ func main() {
 
 		}
 	}
+
 }
 
 func scanForInput() chan string {
