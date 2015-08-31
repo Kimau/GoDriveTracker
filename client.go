@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -23,8 +24,9 @@ import (
 
 // Flags
 var (
-	cacheToken = flag.Bool("cachetoken", true, "cache the OAuth 2.0 token")
-	debug      = flag.Bool("debug", false, "show HTTP traffic")
+	cacheToken   = flag.Bool("cachetoken", true, "cache the OAuth 2.0 token")
+	debug        = flag.Bool("debug", false, "show HTTP traffic")
+	ClientScopes = []string{}
 )
 
 type ClientSecret struct {
@@ -33,16 +35,20 @@ type ClientSecret struct {
 }
 
 func main() {
+	var err error
 	flag.Parse()
 
 	// X
-	secret := loadClientSecret("_secret.json")
+	secret, err := loadClientSecret("_secret.json")
+	if err != nil {
+		log.Fatalln("Secret Missing: %s", err)
+	}
 
 	config := &oauth2.Config{
-		ClientID:     secret.ClientId,
-		ClientSecret: secret.ClientSecret,
+		ClientID:     secret.Id,
+		ClientSecret: secret.Secret,
 		Endpoint:     google.Endpoint,
-		Scopes:       []string{urlshortener.UrlshortenerScope},
+		Scopes:       ClientScopes,
 	}
 
 	ctx := context.Background()
@@ -53,23 +59,24 @@ func main() {
 	}
 
 	c := newOAuthClient(ctx, config)
-	urlShortenerMain(c, flag.Args()[1:])
+	setupClients(c)
+
+	GetSortDriveList()
 }
 
-func loadClientSecret(filename string) ClientSecret {
+func loadClientSecret(filename string) (*ClientSecret, error) {
 	jsonBlob, err := ioutil.ReadFile(filename)
 	if err != nil {
-		log.Fatalln(err)
-		return
+		return nil, err
 	}
 
 	var cs ClientSecret
-	err = json.Unmarshal(jsonBlob, cs)
+	err = json.Unmarshal(jsonBlob, &cs)
 	if err != nil {
-		log.Fatalln("Error in JSON ", err)
+		return nil, err
 	}
 
-	return cs
+	return &cs, nil
 }
 
 func tokenCacheFile(config *oauth2.Config) string {
@@ -77,7 +84,7 @@ func tokenCacheFile(config *oauth2.Config) string {
 	hash.Write([]byte(config.ClientID))
 	hash.Write([]byte(config.ClientSecret))
 	hash.Write([]byte(strings.Join(config.Scopes, " ")))
-	fn := fmt.Sprintf("go-api-demo-tok%v", hash.Sum32())
+	fn := fmt.Sprintf("_cache-tok%v", hash.Sum32())
 	return url.QueryEscape(fn)
 }
 
@@ -111,7 +118,8 @@ func newOAuthClient(ctx context.Context, config *oauth2.Config) *http.Client {
 		token = tokenFromWeb(ctx, config)
 		saveToken(cacheFile, token)
 	} else {
-		log.Printf("Using cached token %#v from %q", token, cacheFile)
+		log.Printf("Using cached token")
+		//log.Printf("Using cached token %#v from %q", token, cacheFile)
 	}
 
 	return config.Client(ctx, token)
@@ -142,9 +150,12 @@ func tokenFromWeb(ctx context.Context, config *oauth2.Config) *oauth2.Token {
 	defer ts.Close()
 
 	config.RedirectURL = ts.URL
-	authURL := config.AuthCodeURL(randState)
-	go openURL(authURL)
-	log.Printf("Authorize this app at: %s", authURL)
+	{ // Auto
+		authURL := config.AuthCodeURL(randState)
+		go openURL(authURL)
+		log.Printf("Authorize this app at\n--\n %s \n--\n", authURL)
+	}
+
 	code := <-ch
 	log.Printf("Got code: %s", code)
 
