@@ -54,7 +54,7 @@ func main() {
 	OpenDB("_data.db")
 
 	DumpDocListKeys()
-	LoadFileDumpStats("1-7VSRgGXb0mqvC75s6t2wuGWeeGfarDxivH5RR9VvSw")
+	LoadFileDumpStats("1tD8oE8lgA06p39utoNP_NCE-kToLaws46SCiWKbpi68")
 
 	commandLoop()
 

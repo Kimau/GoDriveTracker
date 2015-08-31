@@ -201,9 +201,22 @@ func LoadFileDumpStats(fileId string) {
 			for k, v := range wCount {
 				fmt.Println(k, ":", v)
 			}*/
-
 	}
 
-	//loginClient
+	// Attempt to get revisions
+	for rev := LoadNextRevision(fileId, ""); rev != nil; rev = LoadNextRevision(fileId, rev.Id) {
+		<-driveThrottle // Rate Limit
+		r, e := loginClient.Get(rev.ExportLinks["text/plain"])
+		if e != nil {
+			log.Println("Failed to get text file", e.Error())
+			continue
+		}
+
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(r.Body)
+		bodyStr := buf.String()
+		wCount, total := WordCount(bodyStr)
+		fmt.Printf("REV: %s %s \n Word Count: %d \n Different Words: %d \n", rev.Id, rev.ModifiedDate, total, len(wCount))
+	}
 
 }

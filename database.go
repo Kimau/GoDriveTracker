@@ -165,6 +165,9 @@ func LoadNextRevision(fileId string, revID string) *drive.Revision {
 		c := bucket.Cursor()
 		c.First()
 		k, v := c.Seek(seekKey)
+		if revID != "" {
+			k, v = c.Next()
+		}
 
 		if k == nil {
 			return errors.New("No more revisions")
