@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,6 +18,7 @@ const (
 )
 
 var (
+	loginClient   *http.Client
 	urlSvc        *urlshortener.Service
 	drvSvc        *drive.Service
 	driveThrottle <-chan time.Time
@@ -32,6 +34,8 @@ func init() {
 
 func setupClients(client *http.Client) {
 	var err error
+
+	loginClient = client
 
 	urlSvc, err = urlshortener.New(client)
 	if err != nil {
@@ -165,4 +169,41 @@ func GetSortDriveList() error {
 	wg.Wait()
 
 	return nil
+}
+
+func LoadFileDumpStats(fileId string) {
+	f := LoadFile(fileId)
+	if f == nil {
+		fmt.Println("File not found:", fileId)
+		return
+	}
+
+	fmt.Printf("Title: %s \n\t Last Mod: %s \n", f.Title, f.ModifiedDate)
+
+	<-driveThrottle // Rate Limit
+	r, e := loginClient.Get(f.ExportLinks["text/plain"])
+	if e != nil {
+		log.Println("Failed to get text file", e.Error())
+	} else {
+
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(r.Body)
+		bodyStr := buf.String()
+		wCount, total := WordCount(bodyStr)
+		fmt.Printf("Word Count: %d \n Different Words: %d \n", total, len(wCount))
+
+		/*
+			fmt.Println("\n=========================================\n")
+
+			fmt.Print(bodyStr)
+			fmt.Println("\n=========================================\n")
+
+			for k, v := range wCount {
+				fmt.Println(k, ":", v)
+			}*/
+
+	}
+
+	//loginClient
+
 }

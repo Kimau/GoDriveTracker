@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/boltdb/bolt"
 
@@ -87,35 +88,6 @@ func WriteFile(file *drive.File) {
 	}
 }
 
-func WriteRevision(fileId string, rev *drive.Revision) {
-
-	writeRevFunc := func(tx *bolt.Tx) error {
-		bucket, err := tx.CreateBucketIfNotExists(bucketRevs)
-		if err != nil {
-			return err
-		}
-
-		dat, e2 := json.Marshal(rev)
-
-		e2 = bucket.Put([]byte(fileId+rev.Id), dat)
-		if e2 != nil {
-			return err
-		}
-
-		if *debug {
-			log.Println("Write Revision:", rev.Id)
-		}
-
-		return nil
-	}
-
-	// store some data
-	txErr := boltDB.Update(writeRevFunc)
-	if txErr != nil {
-		log.Fatal(txErr)
-	}
-}
-
 func LoadFile(fileId string) *drive.File {
 	var result drive.File
 
@@ -135,6 +107,79 @@ func LoadFile(fileId string) *drive.File {
 		if errMarshal != nil {
 			log.Println("Unmarshal failed:", errMarshal)
 			return errMarshal
+		}
+
+		return nil
+	}
+
+	// retrieve the data
+	txErr := boltDB.View(loadFileFunc)
+	if txErr != nil {
+		return nil
+	}
+
+	return &result
+}
+
+func WriteRevision(fileId string, rev *drive.Revision) {
+
+	writeRevFunc := func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists(bucketRevs)
+		if err != nil {
+			return err
+		}
+
+		dat, e2 := json.Marshal(rev)
+
+		e2 = bucket.Put([]byte(fileId+" "+rev.Id), dat)
+		if e2 != nil {
+			return err
+		}
+
+		if *debug {
+			log.Println("Write Revision:", rev.Id)
+		}
+
+		return nil
+	}
+
+	// store some data
+	txErr := boltDB.Update(writeRevFunc)
+	if txErr != nil {
+		log.Fatal(txErr)
+	}
+}
+
+func LoadNextRevision(fileId string, revID string) *drive.Revision {
+	var result drive.Revision
+
+	seekKey := []byte(fileId + " " + revID)
+
+	loadFileFunc := func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketRevs)
+		if bucket == nil {
+			log.Printf("Bucket %q not found!", bucketRevs)
+			return errors.New("Bucket not found!")
+		}
+
+		c := bucket.Cursor()
+		c.First()
+		k, v := c.Seek(seekKey)
+
+		if k == nil {
+			return errors.New("No more revisions")
+		}
+		kStr := string(k)
+
+		if strings.HasPrefix(kStr, fileId) {
+			errMarshal := json.Unmarshal(v, &result)
+			if errMarshal != nil {
+				log.Println("Unmarshal failed:", errMarshal)
+				return errMarshal
+			}
+			return nil
+		} else {
+			return errors.New("No more revisions")
 		}
 
 		return nil
@@ -185,14 +230,4 @@ func DumpDocListKeys() {
 	if txErr != nil {
 		log.Fatal(txErr)
 	}
-}
-
-func LoadFileDumpStats(fileId string) {
-	f := LoadFile(fileId)
-	if f == nil {
-		fmt.Println("File not found:", fileId)
-		return
-	}
-
-	fmt.Printf("Title: %s \t Last Mod: %s \n", f.Title, f.ModifiedDate)
 }
