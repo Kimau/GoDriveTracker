@@ -151,12 +151,53 @@ func WriteRevision(fileId string, rev *drive.Revision) {
 	}
 }
 
+func LoadNextFile(fileId string) *drive.File {
+	var result drive.File
+
+	seekKey := []byte(fileId)
+
+	loadFunc := func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketDoc)
+		if bucket == nil {
+			log.Printf("Bucket %q not found!", bucketDoc)
+			return errors.New("Bucket not found!")
+		}
+
+		c := bucket.Cursor()
+		k, v := c.First()
+		if len(fileId) > 0 {
+			k, v = c.Seek(seekKey)
+			k, v = c.Next()
+		}
+
+		if k == nil {
+			return errors.New("No more Files")
+		}
+
+		errMarshal := json.Unmarshal(v, &result)
+		if errMarshal != nil {
+			log.Println("Unmarshal failed:", errMarshal)
+			return errMarshal
+		}
+		return nil
+	}
+
+	// retrieve the data
+	txErr := boltDB.View(loadFunc)
+	if txErr != nil {
+		// log.Fatalln(txErr)
+		return nil
+	}
+
+	return &result
+}
+
 func LoadNextRevision(fileId string, revID string) *drive.Revision {
 	var result drive.Revision
 
 	seekKey := []byte(fileId + " " + revID)
 
-	loadFileFunc := func(tx *bolt.Tx) error {
+	loadFunc := func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(bucketRevs)
 		if bucket == nil {
 			log.Printf("Bucket %q not found!", bucketRevs)
@@ -190,8 +231,9 @@ func LoadNextRevision(fileId string, revID string) *drive.Revision {
 	}
 
 	// retrieve the data
-	txErr := boltDB.View(loadFileFunc)
+	txErr := boltDB.View(loadFunc)
 	if txErr != nil {
+		// log.Fatalln(txErr)
 		return nil
 	}
 

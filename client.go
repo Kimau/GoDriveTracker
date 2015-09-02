@@ -31,6 +31,10 @@ type ClientSecret struct {
 	Secret string `json:"client_secret"`
 }
 
+func init() {
+	commandFuncs["fullstatsweep"] = FullFileSweep
+}
+
 func startClient() error {
 	// X
 	secret, err := loadClientSecret("_secret.json")
@@ -181,4 +185,14 @@ func valueOrFileContents(value string, filename string) string {
 		log.Fatalf("Error reading %q: %v", filename, err)
 	}
 	return strings.TrimSpace(string(slurp))
+}
+
+func FullFileSweep() error {
+
+	for file := LoadNextFile(""); file != nil; file = LoadNextFile(file.Id) {
+		GenerateStatsFile(file)
+		log.Println(file.Id)
+	}
+
+	return nil
 }

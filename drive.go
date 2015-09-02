@@ -246,4 +246,6 @@ func GenerateStatsFile(file *drive.File) {
 
 	}
 
+	WriteStats(&dStat)
+	log.Println("Stats File Generated:", file.Title, file.Id)
 }
