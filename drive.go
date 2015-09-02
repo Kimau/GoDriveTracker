@@ -27,6 +27,7 @@ var (
 func init() {
 	ClientScopes = append(ClientScopes, urlshortener.UrlshortenerScope, drive.DriveReadonlyScope)
 	commandFuncs["doclist"] = GetSortDriveList
+	commandFuncs["statlist"] = FullFileStatPrintout
 
 	rate := time.Second / 10
 	driveThrottle = time.Tick(rate)
@@ -248,4 +249,19 @@ func GenerateStatsFile(file *drive.File) {
 
 	WriteStats(&dStat)
 	log.Println("Stats File Generated:", file.Title, file.Id)
+}
+
+func FullFileStatPrintout() error {
+
+	for file := LoadNextFile(""); file != nil; file = LoadNextFile(file.Id) {
+		stat := LoadStats(file.Id)
+
+		fmt.Printf("%3d \tTitle: %s \n\t Last Mod: %s \n", file.Version, file.Title, file.ModifiedDate)
+
+		for _, v := range stat.RevList {
+			fmt.Printf("%s \t Word Count: %d \t Different Words: %d \n", v.ModDate, v.WordCount, len(v.WordFreq))
+		}
+	}
+
+	return nil
 }
