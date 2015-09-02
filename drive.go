@@ -178,7 +178,7 @@ func LoadFileDumpStats(fileId string) {
 		return
 	}
 
-	fmt.Printf("Title: %s \n\t Last Mod: %s \n", f.Title, f.ModifiedDate)
+	fmt.Printf("%3d \tTitle: %s \n\t Last Mod: %s \n", f.Version, f.Title, f.ModifiedDate)
 
 	<-driveThrottle // Rate Limit
 	r, e := loginClient.Get(f.ExportLinks["text/plain"])
@@ -217,6 +217,33 @@ func LoadFileDumpStats(fileId string) {
 		bodyStr := buf.String()
 		wCount, total := WordCount(bodyStr)
 		fmt.Printf("REV: %s %s \n Word Count: %d \n Different Words: %d \n", rev.Id, rev.ModifiedDate, total, len(wCount))
+	}
+
+}
+
+func GenerateStatsFile(file *drive.File) {
+	dStat := DocStat{FileId: file.Id, LastMod: file.ModifiedDate}
+
+	for rev := LoadNextRevision(file.Id, ""); rev != nil; rev = LoadNextRevision(file.Id, rev.Id) {
+		<-driveThrottle // Rate Limit
+		r, e := loginClient.Get(rev.ExportLinks["text/plain"])
+		if e != nil {
+			log.Println("Failed to get text file", e.Error())
+			continue
+		}
+
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(r.Body)
+		bodyStr := buf.String()
+		wCount, wTotal := WordCount(bodyStr)
+
+		revStat := RevStat{RevId: rev.Id, WordCount: wTotal, ModDate: rev.ModifiedDate}
+		for k, v := range wCount {
+			revStat.WordFreq = append(revStat.WordFreq, WordPair{k, v})
+		}
+		sort.Sort(WordPairByVol(revStat.WordFreq))
+		dStat.RevList = append(dStat.RevList, revStat)
+
 	}
 
 }

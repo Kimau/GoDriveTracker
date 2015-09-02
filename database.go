@@ -14,6 +14,7 @@ import (
 
 var bucketDoc = []byte("doc")
 var bucketRevs = []byte("revs")
+var bucketStats = []byte("stats")
 var boltDB *bolt.DB
 
 func OpenDB(filename string) {
@@ -190,6 +191,69 @@ func LoadNextRevision(fileId string, revID string) *drive.Revision {
 
 	// retrieve the data
 	txErr := boltDB.View(loadFileFunc)
+	if txErr != nil {
+		return nil
+	}
+
+	return &result
+}
+
+func WriteStats(fStat *DocStat) {
+	writeFunc := func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists(bucketStats)
+		if err != nil {
+			log.Println("Bucket failed:", err)
+			return err
+		}
+
+		dat, eMarshal := json.Marshal(fStat)
+		if eMarshal != nil {
+			log.Println("Marhsal failed:", eMarshal)
+			return eMarshal
+		}
+
+		ePut := bucket.Put([]byte(fStat.FileId), dat)
+		if ePut != nil {
+			log.Println("Put failed:", ePut)
+			return ePut
+		}
+
+		return nil
+	}
+
+	// store some data
+	txErr := boltDB.Update(writeFunc)
+	if txErr != nil {
+		log.Fatal(txErr)
+	}
+}
+
+func LoadStats(fileId string) *DocStat {
+	var result DocStat
+
+	loadFunc := func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketStats)
+		if bucket == nil {
+			log.Printf("Bucket %q not found!", bucketStats)
+			return errors.New("Bucket not found!")
+		}
+
+		dat := bucket.Get([]byte(fileId))
+		if dat == nil {
+			return errors.New("File not found")
+		}
+
+		errMarshal := json.Unmarshal(dat, &result)
+		if errMarshal != nil {
+			log.Println("Unmarshal failed:", errMarshal)
+			return errMarshal
+		}
+
+		return nil
+	}
+
+	// retrieve the data
+	txErr := boltDB.View(loadFunc)
 	if txErr != nil {
 		return nil
 	}
