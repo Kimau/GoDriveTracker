@@ -186,13 +186,3 @@ func valueOrFileContents(value string, filename string) string {
 	}
 	return strings.TrimSpace(string(slurp))
 }
-
-func FullFileSweep() error {
-
-	for file := LoadNextFile(""); file != nil; file = LoadNextFile(file.Id) {
-		GenerateStatsFile(file)
-		log.Println(file.Id)
-	}
-
-	return nil
-}

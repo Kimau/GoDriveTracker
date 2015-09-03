@@ -270,9 +270,19 @@ func FullFileStatPrintout() error {
 
 			dv, ok := dates[shortDate]
 			if !ok {
-				dv = DailyStat{WordAdd: 0, WordSub: 0, ModDate: shortDate, FileList: []string{file.Id}}
+				dv = DailyStat{
+					WordAdd:  0,
+					WordSub:  0,
+					ModDate:  shortDate,
+					FileRevs: map[string][]string{file.Id: {v.RevId}},
+				}
 			} else {
-				dv.FileList = append(dv.FileList, file.Id)
+				revSubList, okFile := dv.FileRevs[file.Id]
+				if !okFile {
+					dv.FileRevs[file.Id] = []string{v.RevId}
+				} else {
+					dv.FileRevs[file.Id] = append(revSubList, v.RevId)
+				}
 			}
 
 			diff := v.WordCount - prev
@@ -305,7 +315,7 @@ func FullFileStatPrintout() error {
 		WriteDailyStats(&v)
 	}
 	for day := LoadNextDailyStat(""); day != nil; day = LoadNextDailyStat(day.ModDate) {
-		fmt.Printf("%s %d:%d  %d \n", day.ModDate, day.WordAdd, day.WordSub, len(day.FileList))
+		fmt.Printf("%s %d:%d  %d \n", day.ModDate, day.WordAdd, day.WordSub, len(day.FileRevs))
 	}
 
 	return nil

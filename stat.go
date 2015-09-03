@@ -33,13 +33,15 @@ type DocStat struct {
 }
 
 type DailyStat struct {
-	WordAdd  int      `json:"WordAdd"`
-	WordSub  int      `json:"WordSub"`
-	ModDate  string   `json:"ModDate"`
-	FileList []string `json:"FileList"`
+	WordAdd  int                 `json:"WordAdd"`
+	WordSub  int                 `json:"WordSub"`
+	ModDate  string              `json:"ModDate"`
+	FileRevs map[string][]string `json:"FileRevList"`
 }
 
 func (day *DailyStat) AddFile(newDoc *DocStat) {
+
+	revSubList, okFile := day.FileRevs[newDoc.FileId]
 
 	// Word Changes
 	prev := 0
@@ -54,25 +56,18 @@ func (day *DailyStat) AddFile(newDoc *DocStat) {
 				day.WordSub = day.WordSub + diff
 			}
 
+			if !okFile {
+				day.FileRevs[newDoc.FileId] = []string{v.RevId}
+				okFile = true
+			} else {
+				day.FileRevs[newDoc.FileId] = append(revSubList, v.RevId)
+			}
+
 			break
 		}
 
 		prev = v.WordCount
 	}
-
-	// File List
-	addMe := true
-	for _, compV := range day.FileList {
-		if newDoc.FileId == compV {
-			addMe = false
-			break
-		}
-	}
-
-	if addMe {
-		day.FileList = append(day.FileList, newDoc.FileId)
-	}
-
 }
 
 func (day *DailyStat) AddDay(newDay *DailyStat) {
@@ -83,14 +78,25 @@ func (day *DailyStat) AddDay(newDay *DailyStat) {
 
 	day.WordAdd += newDay.WordAdd
 	day.WordSub += newDay.WordSub
-	for _, v := range newDay.FileList {
-		for _, compV := range day.FileList {
-			if v == compV {
-				goto SkipMe
-			}
+
+	// File List
+	for fk, fv := range newDay.FileRevs {
+		revSubList, okFile := day.FileRevs[fk]
+		if !okFile {
+			day.FileRevs[fk] = fv
+		} else {
+			day.FileRevs[fk] = append(revSubList, fv...)
 		}
-		day.FileList = append(day.FileList, newDay.FileList...)
-	SkipMe:
 	}
 
+}
+
+func FullFileSweep() error {
+
+	for file := LoadNextFile(""); file != nil; file = LoadNextFile(file.Id) {
+		GenerateStatsFile(file)
+		log.Println(file.Id)
+	}
+
+	return nil
 }

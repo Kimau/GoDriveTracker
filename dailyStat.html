@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Daily Page: {{.LongDate}}</title>
+</head>
+<body>
+
+<h1>Wrote <span class="add">{{.AddWordCount}}</span> words</h1>
+<h2>Deleted <span class="sub">{{.SubWordCount}}</span> words</h2>
+
+<h3>Files Changed</h3>
+{{range .FileList}}
+  <li>{{.Title}} <span class="add">{{.AddWordCount}}</span><span class="sub">{{.SubWordCount}}</span></li>
+{{end}}
+
+</body>
+</html>

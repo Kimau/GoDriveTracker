@@ -56,7 +56,9 @@ func main() {
 	//DumpDocListKeys()
 	//LoadFileDumpStats("1tD8oE8lgA06p39utoNP_NCE-kToLaws46SCiWKbpi68")
 	//FullFileSweep()
-	FullFileStatPrintout()
+	//FullFileStatPrintout()
+
+	MakeWebFace(":1667", "./static", "./templates")
 
 	commandLoop()
 
