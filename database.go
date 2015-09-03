@@ -14,7 +14,8 @@ import (
 
 var bucketDoc = []byte("doc")
 var bucketRevs = []byte("revs")
-var bucketStats = []byte("stats")
+var bucketDocStats = []byte("stats")
+var bucketDaily = []byte("daily")
 var boltDB *bolt.DB
 
 func OpenDB(filename string) {
@@ -240,9 +241,9 @@ func LoadNextRevision(fileId string, revID string) *drive.Revision {
 	return &result
 }
 
-func WriteStats(fStat *DocStat) {
+func WriteFileStats(fStat *DocStat) {
 	writeFunc := func(tx *bolt.Tx) error {
-		bucket, err := tx.CreateBucketIfNotExists(bucketStats)
+		bucket, err := tx.CreateBucketIfNotExists(bucketDocStats)
 		if err != nil {
 			log.Println("Bucket failed:", err)
 			return err
@@ -270,17 +271,80 @@ func WriteStats(fStat *DocStat) {
 	}
 }
 
-func LoadStats(fileId string) *DocStat {
+func LoadFileStats(fileId string) *DocStat {
 	var result DocStat
 
 	loadFunc := func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(bucketStats)
+		bucket := tx.Bucket(bucketDocStats)
 		if bucket == nil {
-			log.Printf("Bucket %q not found!", bucketStats)
+			log.Printf("Bucket %q not found!", bucketDocStats)
 			return errors.New("Bucket not found!")
 		}
 
 		dat := bucket.Get([]byte(fileId))
+		if dat == nil {
+			return errors.New("File not found")
+		}
+
+		errMarshal := json.Unmarshal(dat, &result)
+		if errMarshal != nil {
+			log.Println("Unmarshal failed:", errMarshal)
+			return errMarshal
+		}
+
+		return nil
+	}
+
+	// retrieve the data
+	txErr := boltDB.View(loadFunc)
+	if txErr != nil {
+		return nil
+	}
+
+	return &result
+}
+
+func WriteDailyStats(day *DailyStat) {
+	writeFunc := func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists(bucketDaily)
+		if err != nil {
+			log.Println("Bucket failed:", err)
+			return err
+		}
+
+		dat, eMarshal := json.Marshal(day)
+		if eMarshal != nil {
+			log.Println("Marhsal failed:", eMarshal)
+			return eMarshal
+		}
+
+		ePut := bucket.Put([]byte(day.ModDate), dat)
+		if ePut != nil {
+			log.Println("Put failed:", ePut)
+			return ePut
+		}
+
+		return nil
+	}
+
+	// store some data
+	txErr := boltDB.Update(writeFunc)
+	if txErr != nil {
+		log.Fatal(txErr)
+	}
+}
+
+func LoadDailyStats(shortDate string) *DailyStat {
+	var result DailyStat
+
+	loadFunc := func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketDaily)
+		if bucket == nil {
+			log.Printf("Bucket %q not found!", bucketDaily)
+			return errors.New("Bucket not found!")
+		}
+
+		dat := bucket.Get([]byte(shortDate))
 		if dat == nil {
 			return errors.New("File not found")
 		}

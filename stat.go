@@ -1,7 +1,8 @@
 package main
 
 import (
-//	"encoding/json"
+	"log"
+	//	"encoding/json"
 )
 
 // Sort by Modified Date and Type
@@ -29,4 +30,67 @@ type DocStat struct {
 	FileId  string    `json:"FileId"`
 	LastMod string    `json:"LastMod"`
 	RevList []RevStat `json:"RevList"`
+}
+
+type DailyStat struct {
+	WordAdd  int      `json:"WordAdd"`
+	WordSub  int      `json:"WordSub"`
+	ModDate  string   `json:"ModDate"`
+	FileList []string `json:"FileList"`
+}
+
+func (day *DailyStat) AddFile(newDoc *DocStat) {
+
+	// Word Changes
+	prev := 0
+	for _, v := range newDoc.RevList {
+		shortDate := v.ModDate[:10]
+
+		if shortDate == day.ModDate {
+			diff := v.WordCount - prev
+			if diff >= 0 {
+				day.WordAdd = day.WordAdd + diff
+			} else {
+				day.WordSub = day.WordSub + diff
+			}
+
+			break
+		}
+
+		prev = v.WordCount
+	}
+
+	// File List
+	addMe := true
+	for _, compV := range day.FileList {
+		if newDoc.FileId == compV {
+			addMe = false
+			break
+		}
+	}
+
+	if addMe {
+		day.FileList = append(day.FileList, newDoc.FileId)
+	}
+
+}
+
+func (day *DailyStat) AddDay(newDay *DailyStat) {
+	if day.ModDate != newDay.ModDate {
+		log.Fatalln("Dates must match", day.ModDate, newDay.ModDate)
+		return
+	}
+
+	day.WordAdd += newDay.WordAdd
+	day.WordSub += newDay.WordSub
+	for _, v := range newDay.FileList {
+		for _, compV := range day.FileList {
+			if v == compV {
+				goto SkipMe
+			}
+		}
+		day.FileList = append(day.FileList, newDay.FileList...)
+	SkipMe:
+	}
+
 }

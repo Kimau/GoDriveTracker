@@ -247,20 +247,58 @@ func GenerateStatsFile(file *drive.File) {
 
 	}
 
-	WriteStats(&dStat)
+	WriteFileStats(&dStat)
 	log.Println("Stats File Generated:", file.Title, file.Id)
 }
 
 func FullFileStatPrintout() error {
 
+	var dates = map[string]DailyStat{}
+
 	for file := LoadNextFile(""); file != nil; file = LoadNextFile(file.Id) {
-		stat := LoadStats(file.Id)
+		stat := LoadFileStats(file.Id)
 
 		fmt.Printf("%3d \tTitle: %s \n\t Last Mod: %s \n", file.Version, file.Title, file.ModifiedDate)
+		prev := 0
 
+		// Faster to do all dates then merge
 		for _, v := range stat.RevList {
-			fmt.Printf("%s \t Word Count: %d \t Different Words: %d \n", v.ModDate, v.WordCount, len(v.WordFreq))
+			shortDate := v.ModDate[:10]
+
+			dv, ok := dates[shortDate]
+			if !ok {
+				dv = DailyStat{WordAdd: 0, WordSub: 0, ModDate: shortDate, FileList: []string{file.Id}}
+			} else {
+				dv.FileList = append(dv.FileList, file.Id)
+			}
+
+			diff := v.WordCount - prev
+			if diff >= 0 {
+				dv.WordAdd = dv.WordAdd + diff
+			} else {
+				dv.WordSub = dv.WordSub + diff
+			}
+			dates[shortDate] = dv
+
+			fmt.Printf("%s \t Word Count: %d (%+d) \t Different Words: %d \n", v.ModDate, v.WordCount, diff, len(v.WordFreq))
+			prev = v.WordCount
 		}
+	}
+
+	/* OVERWRITE FOR NOW
+	for k, v := range dates {
+		oldDay := LoadDailyStats(k)
+		if(oldDay == nil) {
+			WriteDailyStats(v)
+			} else {
+				oldDay.AddDay(k)
+			}
+		fmt.Println(k, v.add, v.sub)
+	}
+	*/
+	for k, v := range dates {
+		WriteDailyStats(&v)
+		fmt.Printf("%s %d:%d  %d \n", k, v.WordAdd, v.WordSub, len(v.FileList))
 	}
 
 	return nil
