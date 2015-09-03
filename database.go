@@ -241,6 +241,88 @@ func LoadNextRevision(fileId string, revID string) *drive.Revision {
 	return &result
 }
 
+func LoadNextFileStat(fileId string) *DocStat {
+	var result DocStat
+
+	seekKey := []byte(fileId)
+
+	loadFunc := func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketDocStats)
+		if bucket == nil {
+			log.Printf("Bucket %q not found!", bucketDocStats)
+			return errors.New("Bucket not found!")
+		}
+
+		c := bucket.Cursor()
+		k, v := c.First()
+		if len(fileId) > 0 {
+			k, v = c.Seek(seekKey)
+			k, v = c.Next()
+		}
+
+		if k == nil {
+			return errors.New("No more Doc Stats")
+		}
+
+		errMarshal := json.Unmarshal(v, &result)
+		if errMarshal != nil {
+			log.Println("Unmarshal failed:", errMarshal)
+			return errMarshal
+		}
+		return nil
+	}
+
+	// retrieve the data
+	txErr := boltDB.View(loadFunc)
+	if txErr != nil {
+		// log.Fatalln(txErr)
+		return nil
+	}
+
+	return &result
+}
+
+func LoadNextDailyStat(shortDate string) *DailyStat {
+	var result DailyStat
+
+	seekKey := []byte(shortDate)
+
+	loadFunc := func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketDaily)
+		if bucket == nil {
+			log.Printf("Bucket %q not found!", bucketDaily)
+			return errors.New("Bucket not found!")
+		}
+
+		c := bucket.Cursor()
+		k, v := c.First()
+		if len(shortDate) > 0 {
+			k, v = c.Seek(seekKey)
+			k, v = c.Next()
+		}
+
+		if k == nil {
+			return errors.New("No more Faily Stats")
+		}
+
+		errMarshal := json.Unmarshal(v, &result)
+		if errMarshal != nil {
+			log.Println("Unmarshal failed:", errMarshal)
+			return errMarshal
+		}
+		return nil
+	}
+
+	// retrieve the data
+	txErr := boltDB.View(loadFunc)
+	if txErr != nil {
+		// log.Fatalln(txErr)
+		return nil
+	}
+
+	return &result
+}
+
 func WriteFileStats(fStat *DocStat) {
 	writeFunc := func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists(bucketDocStats)

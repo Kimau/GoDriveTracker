@@ -255,6 +255,9 @@ func FullFileStatPrintout() error {
 
 	var dates = map[string]DailyStat{}
 
+	// Loading File mostly for debug info not smart
+	// Might want to move over to LoadNextFileStat and putting more info in stat file??
+	// Title is something that changes, but thats true for files as well
 	for file := LoadNextFile(""); file != nil; file = LoadNextFile(file.Id) {
 		stat := LoadFileStats(file.Id)
 
@@ -296,9 +299,13 @@ func FullFileStatPrintout() error {
 		fmt.Println(k, v.add, v.sub)
 	}
 	*/
-	for k, v := range dates {
+
+	// Slower but good test (and get sorting from DB)
+	for _, v := range dates {
 		WriteDailyStats(&v)
-		fmt.Printf("%s %d:%d  %d \n", k, v.WordAdd, v.WordSub, len(v.FileList))
+	}
+	for day := LoadNextDailyStat(""); day != nil; day = LoadNextDailyStat(day.ModDate) {
+		fmt.Printf("%s %d:%d  %d \n", day.ModDate, day.WordAdd, day.WordSub, len(day.FileList))
 	}
 
 	return nil
