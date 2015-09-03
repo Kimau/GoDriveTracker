@@ -12,7 +12,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -156,6 +155,7 @@ func tokenFromWeb(ctx context.Context, config *oauth2.Config) *oauth2.Token {
 	}
 
 	code := <-ch
+	openURL("")
 	log.Printf("Got code: %s", code)
 
 	token, err := config.Exchange(ctx, code)
@@ -163,17 +163,6 @@ func tokenFromWeb(ctx context.Context, config *oauth2.Config) *oauth2.Token {
 		log.Fatalf("Token exchange error: %v", err)
 	}
 	return token
-}
-
-func openURL(url string) {
-	try := []string{"xdg-open", "google-chrome", "open"}
-	for _, bin := range try {
-		err := exec.Command(bin, url).Run()
-		if err == nil {
-			return
-		}
-	}
-	log.Printf("Error opening URL in browser.")
 }
 
 func valueOrFileContents(value string, filename string) string {

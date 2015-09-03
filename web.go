@@ -14,35 +14,35 @@ type WebFace struct {
 	StaticRoot string
 	Templates  string
 	Router     *http.ServeMux
+	Redirect   string
 
-	OutMsg             chan string
-	InMsg              chan string
-	GlobalTemplateData map[string]string
+	OutMsg chan string
+	InMsg  chan string
 }
 
 var (
 	rePathMatch = regexp.MustCompile("/day/([0-9]+)[/\\-]([0-9]+)[/\\-]([0-9]+)")
+	activeWF    *WebFace
 )
 
 func MakeWebFace(addr string, static_root string, templatesFolder string) *WebFace {
-	w := &WebFace{
+	activeWF = &WebFace{
 		Addr:       addr,
 		Router:     http.NewServeMux(),
 		StaticRoot: static_root,
 		Templates:  templatesFolder,
 
-		OutMsg:             make(chan string),
-		InMsg:              make(chan string),
-		GlobalTemplateData: make(map[string]string),
+		OutMsg: make(chan string),
+		InMsg:  make(chan string),
 	}
 
-	w.Router.Handle("/static/", http.FileServer(http.Dir(static_root)))
-	w.Router.HandleFunc("/", SummaryHandle)
-	w.Router.HandleFunc("/day/", DayHandle)
+	activeWF.Router.Handle("/static/", http.FileServer(http.Dir(static_root)))
+	activeWF.Router.HandleFunc("/", SummaryHandle)
+	activeWF.Router.HandleFunc("/day/", DayHandle)
 
-	go w.HostLoop()
+	go activeWF.HostLoop()
 
-	return w
+	return activeWF
 }
 
 func (wf *WebFace) HostLoop() {
@@ -55,7 +55,19 @@ func (wf *WebFace) HostLoop() {
 	}
 }
 
+func openURL(url string) {
+	if activeWF == nil {
+		return
+	}
+
+	activeWF.Redirect = url
+}
+
 func SummaryHandle(rw http.ResponseWriter, req *http.Request) {
+	if activeWF.Redirect != "" {
+		http.Redirect(rw, req, activeWF.Redirect, 307)
+		return
+	}
 
 	for dayStat := LoadNextDailyStat(""); dayStat != nil; dayStat = LoadNextDailyStat(dayStat.ModDate) {
 		fmt.Fprintf(rw, `<div><a href="/day/%s">%s</a> you wrote %d words and deleted %d words.</div>`, dayStat.ModDate, dayStat.ModDate, dayStat.WordAdd, dayStat.WordSub)
@@ -64,6 +76,10 @@ func SummaryHandle(rw http.ResponseWriter, req *http.Request) {
 }
 
 func DayHandle(rw http.ResponseWriter, req *http.Request) {
+	if activeWF.Redirect != "" {
+		http.Redirect(rw, req, activeWF.Redirect, 307)
+		return
+	}
 
 	matches := rePathMatch.FindAllStringSubmatch(req.URL.String(), -1)
 	if len(matches) < 1 {
