@@ -15,6 +15,7 @@ type WebFace struct {
 	Templates  string
 	Router     *http.ServeMux
 	Redirect   string
+	LoginURL   string
 
 	OutMsg chan string
 	InMsg  chan string
@@ -49,13 +50,35 @@ func (wf *WebFace) HostLoop() {
 	defer log.Println("Stopped Listening")
 
 	log.Println("Listening on", wf.Addr)
-	err := http.ListenAndServe(wf.Addr, wf.Router)
+	err := http.ListenAndServe(wf.Addr, wf)
 	if err != nil {
 		log.Fatal("ListenAndServe:", err)
 	}
 }
 
-func openURL(url string) {
+func (wf *WebFace) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if activeWF.Redirect != "" {
+		http.Redirect(rw, req, activeWF.Redirect, 307)
+		return
+	}
+
+	if len(activeWF.LoginURL) > 1 {
+		fmt.Fprintf(rw, `<h1><a href="%s" target="_blank">Click to Login</a></h1>`, activeWF.LoginURL)
+		return
+	}
+
+	wf.Router.ServeHTTP(rw, req)
+}
+
+func setLoginURL(url string) {
+	if activeWF == nil {
+		return
+	}
+
+	activeWF.LoginURL = url
+}
+
+func setRedirectURL(url string) {
 	if activeWF == nil {
 		return
 	}
@@ -64,11 +87,6 @@ func openURL(url string) {
 }
 
 func SummaryHandle(rw http.ResponseWriter, req *http.Request) {
-	if activeWF.Redirect != "" {
-		http.Redirect(rw, req, activeWF.Redirect, 307)
-		return
-	}
-
 	for dayStat := LoadNextDailyStat(""); dayStat != nil; dayStat = LoadNextDailyStat(dayStat.ModDate) {
 		fmt.Fprintf(rw, `<div><a href="/day/%s">%s</a> you wrote %d words and deleted %d words.</div>`, dayStat.ModDate, dayStat.ModDate, dayStat.WordAdd, dayStat.WordSub)
 	}
@@ -76,10 +94,6 @@ func SummaryHandle(rw http.ResponseWriter, req *http.Request) {
 }
 
 func DayHandle(rw http.ResponseWriter, req *http.Request) {
-	if activeWF.Redirect != "" {
-		http.Redirect(rw, req, activeWF.Redirect, 307)
-		return
-	}
 
 	matches := rePathMatch.FindAllStringSubmatch(req.URL.String(), -1)
 	if len(matches) < 1 {

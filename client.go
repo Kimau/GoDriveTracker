@@ -150,12 +150,12 @@ func tokenFromWeb(ctx context.Context, config *oauth2.Config) *oauth2.Token {
 	config.RedirectURL = ts.URL
 	{ // Auto
 		authURL := config.AuthCodeURL(randState)
-		go openURL(authURL)
+		go setLoginURL(authURL)
 		log.Printf("Authorize this app at\n--\n %s \n--\n", authURL)
 	}
 
 	code := <-ch
-	openURL("")
+	setLoginURL("")
 	log.Printf("Got code: %s", code)
 
 	token, err := config.Exchange(ctx, code)
