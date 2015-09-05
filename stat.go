@@ -39,6 +39,10 @@ type DailyStat struct {
 	FileRevs map[string][]string `json:"FileRevList"`
 }
 
+type UserStat struct {
+	UpdateDate string `json:"UpdateDate"`
+}
+
 func (day *DailyStat) AddFile(newDoc *DocStat) {
 
 	revSubList, okFile := day.FileRevs[newDoc.FileId]

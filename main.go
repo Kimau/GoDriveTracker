@@ -9,13 +9,15 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"./login"
+	"./web"
 )
 
 type CommandFunc func() error
 
 // Flags
 var (
-	cacheToken   = flag.Bool("cachetoken", true, "cache the OAuth 2.0 token")
 	debug        = flag.Bool("debug", false, "show HTTP traffic")
 	commandFuncs = make(map[string]CommandFunc)
 )
@@ -45,13 +47,27 @@ func init() {
 func main() {
 	commandFuncs["clear"]()
 	flag.Parse()
-	MakeWebFace(":1667", "./static", "./templates")
+
+	wf := web.MakeWebFace("127.0.0.1:1667", "./static", "./templates")
+	SetupWebFace(wf)
 
 	if *debug {
 		log.Println("Debug Active")
 	}
 
-	startClient()
+	loginClient, err := login.StartClient(wf, GetClientScope())
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	setupClients(loginClient)
+
+	iStr, iErr := GetIdentity(login.Token.AccessToken)
+	if iErr != nil {
+		log.Fatalln(iErr)
+	}
+	log.Println("Token Str", iStr)
+
 	OpenDB("_data.db")
 
 	//DumpDocListKeys()

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	drive "google.golang.org/api/drive/v2"
-	urlshortener "google.golang.org/api/urlshortener/v1"
+	oauth "google.golang.org/api/oauth2/v2"
 )
 
 const (
@@ -19,13 +19,12 @@ const (
 
 var (
 	loginClient   *http.Client
-	urlSvc        *urlshortener.Service
+	oauthSvc      *oauth.Service
 	drvSvc        *drive.Service
 	driveThrottle <-chan time.Time
 )
 
 func init() {
-	ClientScopes = append(ClientScopes, urlshortener.UrlshortenerScope, drive.DriveReadonlyScope)
 	commandFuncs["doclist"] = GetSortDriveList
 	commandFuncs["statlist"] = FullFileStatPrintout
 
@@ -33,14 +32,21 @@ func init() {
 	driveThrottle = time.Tick(rate)
 }
 
+func GetClientScope() []string {
+	return []string{
+		drive.DriveReadonlyScope,
+		oauth.PlusMeScope,
+		oauth.UserinfoEmailScope}
+}
+
 func setupClients(client *http.Client) {
 	var err error
 
 	loginClient = client
 
-	urlSvc, err = urlshortener.New(client)
+	oauthSvc, err = oauth.New(client)
 	if err != nil {
-		log.Fatalf("Unable to create UrlShortener service: %v", err)
+		log.Fatalf("Unable to create OAuth service: %v", err)
 	}
 
 	drvSvc, err = drive.New(client)
@@ -49,27 +55,17 @@ func setupClients(client *http.Client) {
 	}
 }
 
-func getShortUrlDetail(shortUrl string) *urlshortener.Url {
-	url, err := urlSvc.Url.Get(shortUrl).Do()
+func GetIdentity(accessTokenStr string) (string, error) {
+	tokenCall := oauthSvc.Tokeninfo()
+	tokenCall.AccessToken(accessTokenStr)
+	token, err := tokenCall.Do()
 	if err != nil {
-		log.Fatalf("URL Get: %v", err)
-		return nil
+		return "", err
 	}
-	fmt.Printf("Lookup of %s: %s\n", url, url.LongUrl)
-	return url
-}
 
-func shortenUrl(longUrl string) *urlshortener.Url {
-	url, err := urlSvc.Url.Insert(&urlshortener.Url{
-		Kind:    "urlshortener#url", // Not really needed
-		LongUrl: longUrl,
-	}).Do()
-	if err != nil {
-		log.Fatalf("URL Insert: %v", err)
-		return nil
-	}
-	fmt.Printf("Shortened %s => %s\n", url, url.Id)
-	return url
+	outStr := fmt.Sprintf("AccessType: %s, \n Email: %s, \n UserId: %s, \n", token.AccessType, token.Email, token.UserId)
+
+	return outStr, nil
 }
 
 // AllRevisions fetches all revisions for a given file

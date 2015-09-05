@@ -1,89 +1,21 @@
 package main
 
 import (
-	//"html/template"
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 	"strconv"
+
+	"./web"
 )
-
-type WebFace struct {
-	Addr       string
-	StaticRoot string
-	Templates  string
-	Router     *http.ServeMux
-	Redirect   string
-	LoginURL   string
-
-	OutMsg chan string
-	InMsg  chan string
-}
 
 var (
 	rePathMatch = regexp.MustCompile("/day/([0-9]+)[/\\-]([0-9]+)[/\\-]([0-9]+)")
-	activeWF    *WebFace
 )
 
-func MakeWebFace(addr string, static_root string, templatesFolder string) *WebFace {
-	activeWF = &WebFace{
-		Addr:       addr,
-		Router:     http.NewServeMux(),
-		StaticRoot: static_root,
-		Templates:  templatesFolder,
-
-		OutMsg: make(chan string),
-		InMsg:  make(chan string),
-	}
-
-	activeWF.Router.Handle("/static/", http.FileServer(http.Dir(static_root)))
-	activeWF.Router.HandleFunc("/", SummaryHandle)
-	activeWF.Router.HandleFunc("/day/", DayHandle)
-
-	go activeWF.HostLoop()
-
-	return activeWF
-}
-
-func (wf *WebFace) HostLoop() {
-	defer log.Println("Stopped Listening")
-
-	log.Println("Listening on", wf.Addr)
-	err := http.ListenAndServe(wf.Addr, wf)
-	if err != nil {
-		log.Fatal("ListenAndServe:", err)
-	}
-}
-
-func (wf *WebFace) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if activeWF.Redirect != "" {
-		http.Redirect(rw, req, activeWF.Redirect, 307)
-		return
-	}
-
-	if len(activeWF.LoginURL) > 1 {
-		fmt.Fprintf(rw, `<h1><a href="%s" target="_blank">Click to Login</a></h1>`, activeWF.LoginURL)
-		return
-	}
-
-	wf.Router.ServeHTTP(rw, req)
-}
-
-func setLoginURL(url string) {
-	if activeWF == nil {
-		return
-	}
-
-	activeWF.LoginURL = url
-}
-
-func setRedirectURL(url string) {
-	if activeWF == nil {
-		return
-	}
-
-	activeWF.Redirect = url
+func SetupWebFace(wf *web.WebFace) {
+	wf.Router.HandleFunc("/", SummaryHandle)
+	wf.Router.HandleFunc("/day/", DayHandle)
 }
 
 func SummaryHandle(rw http.ResponseWriter, req *http.Request) {
@@ -129,5 +61,3 @@ func DayHandle(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 }
-
-//===
