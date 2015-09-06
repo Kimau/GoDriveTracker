@@ -1,27 +1,30 @@
-package main
+package database
 
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"strings"
 
 	"github.com/boltdb/bolt"
 
-	drive "google.golang.org/api/drive/v2"
+	stat "../stat"
+	drive "google.golang.org/api/drive/v2" // DO NOT LIKE THIS! Want to encapse this in google package
 )
 
 var bucketDoc = []byte("doc")
 var bucketRevs = []byte("revs")
 var bucketDocStats = []byte("stats")
 var bucketDaily = []byte("daily")
-var boltDB *bolt.DB
 
-func OpenDB(filename string) {
+type StatTrackerDB struct {
+	db *bolt.DB
+}
+
+func OpenDB(filename string) *StatTrackerDB {
 	var err error
 
-	boltDB, err = bolt.Open(filename, 0600, nil)
+	dbPtr, err := bolt.Open(filename, 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -44,21 +47,22 @@ func OpenDB(filename string) {
 	}
 
 	// store some data
-	txErr := boltDB.Update(writeFileFunc)
+	txErr := dbPtr.Update(writeFileFunc)
 	if txErr != nil {
 		log.Fatal(txErr)
 	}
 
+	return &StatTrackerDB{db: dbPtr}
 }
 
-func CloseDB() {
-	err := boltDB.Close()
+func (st *StatTrackerDB) CloseDB() {
+	err := st.db.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func WriteFile(file *drive.File) {
+func (st *StatTrackerDB) WriteFile(file *drive.File) {
 	writeFileFunc := func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists(bucketDoc)
 		if err != nil {
@@ -84,13 +88,13 @@ func WriteFile(file *drive.File) {
 	}
 
 	// store some data
-	txErr := boltDB.Update(writeFileFunc)
+	txErr := st.db.Update(writeFileFunc)
 	if txErr != nil {
 		log.Fatal(txErr)
 	}
 }
 
-func LoadFile(fileId string) *drive.File {
+func (st *StatTrackerDB) LoadFile(fileId string) *drive.File {
 	var result drive.File
 
 	loadFileFunc := func(tx *bolt.Tx) error {
@@ -115,7 +119,7 @@ func LoadFile(fileId string) *drive.File {
 	}
 
 	// retrieve the data
-	txErr := boltDB.View(loadFileFunc)
+	txErr := st.db.View(loadFileFunc)
 	if txErr != nil {
 		return nil
 	}
@@ -123,7 +127,7 @@ func LoadFile(fileId string) *drive.File {
 	return &result
 }
 
-func WriteRevision(fileId string, rev *drive.Revision) {
+func (st *StatTrackerDB) WriteRevision(fileId string, rev *drive.Revision) {
 
 	writeRevFunc := func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists(bucketRevs)
@@ -138,21 +142,19 @@ func WriteRevision(fileId string, rev *drive.Revision) {
 			return err
 		}
 
-		if *debug {
-			log.Println("Write Revision:", rev.Id)
-		}
+		//log.Println("Write Revision:", rev.Id)
 
 		return nil
 	}
 
 	// store some data
-	txErr := boltDB.Update(writeRevFunc)
+	txErr := st.db.Update(writeRevFunc)
 	if txErr != nil {
 		log.Fatal(txErr)
 	}
 }
 
-func LoadNextFile(fileId string) *drive.File {
+func (st *StatTrackerDB) LoadNextFile(fileId string) *drive.File {
 	var result drive.File
 
 	seekKey := []byte(fileId)
@@ -184,7 +186,7 @@ func LoadNextFile(fileId string) *drive.File {
 	}
 
 	// retrieve the data
-	txErr := boltDB.View(loadFunc)
+	txErr := st.db.View(loadFunc)
 	if txErr != nil {
 		// log.Fatalln(txErr)
 		return nil
@@ -193,7 +195,7 @@ func LoadNextFile(fileId string) *drive.File {
 	return &result
 }
 
-func LoadNextRevision(fileId string, revID string) *drive.Revision {
+func (st *StatTrackerDB) LoadNextRevision(fileId string, revID string) *drive.Revision {
 	var result drive.Revision
 
 	seekKey := []byte(fileId + " " + revID)
@@ -232,7 +234,7 @@ func LoadNextRevision(fileId string, revID string) *drive.Revision {
 	}
 
 	// retrieve the data
-	txErr := boltDB.View(loadFunc)
+	txErr := st.db.View(loadFunc)
 	if txErr != nil {
 		// log.Fatalln(txErr)
 		return nil
@@ -241,8 +243,8 @@ func LoadNextRevision(fileId string, revID string) *drive.Revision {
 	return &result
 }
 
-func LoadNextFileStat(fileId string) *DocStat {
-	var result DocStat
+func (st *StatTrackerDB) LoadNextFileStat(fileId string) *stat.DocStat {
+	var result stat.DocStat
 
 	seekKey := []byte(fileId)
 
@@ -273,7 +275,7 @@ func LoadNextFileStat(fileId string) *DocStat {
 	}
 
 	// retrieve the data
-	txErr := boltDB.View(loadFunc)
+	txErr := st.db.View(loadFunc)
 	if txErr != nil {
 		// log.Fatalln(txErr)
 		return nil
@@ -282,8 +284,8 @@ func LoadNextFileStat(fileId string) *DocStat {
 	return &result
 }
 
-func LoadNextDailyStat(shortDate string) *DailyStat {
-	var result DailyStat
+func (st *StatTrackerDB) LoadNextDailyStat(shortDate string) *stat.DailyStat {
+	var result stat.DailyStat
 
 	seekKey := []byte(shortDate)
 
@@ -314,7 +316,7 @@ func LoadNextDailyStat(shortDate string) *DailyStat {
 	}
 
 	// retrieve the data
-	txErr := boltDB.View(loadFunc)
+	txErr := st.db.View(loadFunc)
 	if txErr != nil {
 		// log.Fatalln(txErr)
 		return nil
@@ -323,7 +325,7 @@ func LoadNextDailyStat(shortDate string) *DailyStat {
 	return &result
 }
 
-func WriteFileStats(fStat *DocStat) {
+func (st *StatTrackerDB) WriteFileStats(fStat *stat.DocStat) {
 	writeFunc := func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists(bucketDocStats)
 		if err != nil {
@@ -347,14 +349,14 @@ func WriteFileStats(fStat *DocStat) {
 	}
 
 	// store some data
-	txErr := boltDB.Update(writeFunc)
+	txErr := st.db.Update(writeFunc)
 	if txErr != nil {
 		log.Fatal(txErr)
 	}
 }
 
-func LoadFileStats(fileId string) *DocStat {
-	var result DocStat
+func (st *StatTrackerDB) LoadFileStats(fileId string) *stat.DocStat {
+	var result stat.DocStat
 
 	loadFunc := func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(bucketDocStats)
@@ -378,7 +380,7 @@ func LoadFileStats(fileId string) *DocStat {
 	}
 
 	// retrieve the data
-	txErr := boltDB.View(loadFunc)
+	txErr := st.db.View(loadFunc)
 	if txErr != nil {
 		return nil
 	}
@@ -386,7 +388,7 @@ func LoadFileStats(fileId string) *DocStat {
 	return &result
 }
 
-func WriteDailyStats(day *DailyStat) {
+func (st *StatTrackerDB) WriteDailyStats(day *stat.DailyStat) {
 	writeFunc := func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists(bucketDaily)
 		if err != nil {
@@ -410,14 +412,14 @@ func WriteDailyStats(day *DailyStat) {
 	}
 
 	// store some data
-	txErr := boltDB.Update(writeFunc)
+	txErr := st.db.Update(writeFunc)
 	if txErr != nil {
 		log.Fatal(txErr)
 	}
 }
 
-func LoadDailyStats(shortDate string) *DailyStat {
-	var result DailyStat
+func (st *StatTrackerDB) LoadDailyStats(shortDate string) *stat.DailyStat {
+	var result stat.DailyStat
 
 	loadFunc := func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(bucketDaily)
@@ -441,48 +443,10 @@ func LoadDailyStats(shortDate string) *DailyStat {
 	}
 
 	// retrieve the data
-	txErr := boltDB.View(loadFunc)
+	txErr := st.db.View(loadFunc)
 	if txErr != nil {
 		return nil
 	}
 
 	return &result
-}
-
-func DumpDocListKeys() {
-	fmt.Println("Dump Doc List")
-
-	dumpDBDocs := func(tx *bolt.Tx) error {
-
-		dumpDoc := func(k, v []byte) error {
-			var result drive.File
-			errMarshal := json.Unmarshal(v, &result)
-
-			if errMarshal != nil {
-				fmt.Printf("%s is not parsed. \n %s \n %s \n", k, errMarshal.Error(), v)
-				return errMarshal
-			} else {
-				fmt.Printf("%s \n\t Title: %s \n\t Last Mod: %s \n", k, result.Title, result.ModifiedDate)
-			}
-
-			return nil
-		}
-
-		bucket := tx.Bucket(bucketDoc)
-		log.Println(bucket.Stats())
-
-		err := bucket.ForEach(dumpDoc)
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-
-		return nil
-	}
-
-	// retrieve the data
-	txErr := boltDB.View(dumpDBDocs)
-	if txErr != nil {
-		log.Fatal(txErr)
-	}
 }

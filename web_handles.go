@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"./database"
 	"./web"
 )
 
@@ -13,19 +14,30 @@ var (
 	rePathMatch = regexp.MustCompile("/day/([0-9]+)[/\\-]([0-9]+)[/\\-]([0-9]+)")
 )
 
-func SetupWebFace(wf *web.WebFace) {
-	wf.Router.HandleFunc("/", SummaryHandle)
-	wf.Router.HandleFunc("/day/", DayHandle)
+func SetupWebFace(wf *web.WebFace, dbPtr *database.StatTrackerDB) {
+	wf.Router.Handle("/", SummaryHandle{db: dbPtr})
+	wf.Router.Handle("/day/", DayHandle{db: dbPtr})
 }
 
-func SummaryHandle(rw http.ResponseWriter, req *http.Request) {
-	for dayStat := LoadNextDailyStat(""); dayStat != nil; dayStat = LoadNextDailyStat(dayStat.ModDate) {
+////////////////////////////////////////////////////////////////////////////////
+// Summary Handle
+type SummaryHandle struct {
+	db *database.StatTrackerDB
+}
+
+func (sh SummaryHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	for dayStat := sh.db.LoadNextDailyStat(""); dayStat != nil; dayStat = sh.db.LoadNextDailyStat(dayStat.ModDate) {
 		fmt.Fprintf(rw, `<div><a href="/day/%s">%s</a> you wrote %d words and deleted %d words.</div>`, dayStat.ModDate, dayStat.ModDate, dayStat.WordAdd, dayStat.WordSub)
 	}
-
 }
 
-func DayHandle(rw http.ResponseWriter, req *http.Request) {
+////////////////////////////////////////////////////////////////////////////////
+// Day Handle
+type DayHandle struct {
+	db *database.StatTrackerDB
+}
+
+func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	matches := rePathMatch.FindAllStringSubmatch(req.URL.String(), -1)
 	if len(matches) < 1 {
@@ -44,7 +56,7 @@ func DayHandle(rw http.ResponseWriter, req *http.Request) {
 
 	shortDate := fmt.Sprintf("%04d-%02d-%02d", year, month, day)
 
-	dayStat := LoadDailyStats(shortDate)
+	dayStat := dh.db.LoadDailyStats(shortDate)
 	if dayStat == nil {
 		fmt.Fprintf(rw, "No stats for %s", shortDate)
 		return
@@ -53,7 +65,7 @@ func DayHandle(rw http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(rw, "On %s you wrote %d words and deleted %d words.\n", dayStat.ModDate, dayStat.WordAdd, dayStat.WordSub)
 	fmt.Fprintf(rw, "Edited %d files. \n", len(dayStat.FileRevs))
 	for k, v := range dayStat.FileRevs {
-		file := LoadFile(k)
+		file := dh.db.LoadFile(k)
 		if file == nil {
 			fmt.Fprintf(rw, "> File [%s] not found [%d revisions] \n", k, len(v))
 		} else {

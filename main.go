@@ -10,8 +10,9 @@ import (
 	"runtime"
 	"strings"
 
-	"./login"
-	"./web"
+	database "./database"
+	google "./google"
+	web "./web"
 )
 
 type CommandFunc func() error
@@ -48,27 +49,25 @@ func main() {
 	commandFuncs["clear"]()
 	flag.Parse()
 
+	db := database.OpenDB("_data.db")
+
 	wf := web.MakeWebFace("127.0.0.1:1667", "./static", "./templates")
-	SetupWebFace(wf)
+	SetupWebFace(wf, db)
 
 	if *debug {
 		log.Println("Debug Active")
 	}
 
-	loginClient, err := login.StartClient(wf, GetClientScope())
-	if err != nil {
-		log.Fatalln(err)
+	_, cErr := google.StartClient(wf, google.GetClientScope())
+	if cErr != nil {
+		log.Fatalln(cErr)
 	}
 
-	setupClients(loginClient)
-
-	iStr, iErr := GetIdentity(login.Token.AccessToken)
+	iStr, iErr := google.GetIdentity()
 	if iErr != nil {
 		log.Fatalln(iErr)
 	}
 	log.Println("Token Str", iStr)
-
-	OpenDB("_data.db")
 
 	//DumpDocListKeys()
 	//LoadFileDumpStats("1tD8oE8lgA06p39utoNP_NCE-kToLaws46SCiWKbpi68")
@@ -76,7 +75,7 @@ func main() {
 	//FullFileStatPrintout()
 	commandLoop()
 
-	CloseDB()
+	db.CloseDB()
 }
 
 func commandLoop() {

@@ -1,4 +1,4 @@
-package main
+package stat
 
 import (
 	"log"
@@ -93,14 +93,4 @@ func (day *DailyStat) AddDay(newDay *DailyStat) {
 		}
 	}
 
-}
-
-func FullFileSweep() error {
-
-	for file := LoadNextFile(""); file != nil; file = LoadNextFile(file.Id) {
-		GenerateStatsFile(file)
-		log.Println(file.Id)
-	}
-
-	return nil
 }

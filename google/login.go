@@ -1,4 +1,4 @@
-package login
+package google
 
 import (
 	"encoding/gob"
@@ -44,6 +44,9 @@ func StartClient(wf *web.WebFace, clientScopes []string) (*http.Client, error) {
 
 	ctx := context.Background()
 	c := newOAuthClient(ctx, config, wf)
+
+	setupClients(c)
+
 	return c, nil
 }
 
