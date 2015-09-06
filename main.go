@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
@@ -10,9 +11,11 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	database "./database"
 	google "./google"
+	stat "./stat"
 	web "./web"
 )
 
@@ -66,22 +69,35 @@ func main() {
 
 	// Login
 	log.Println("Login")
-	_, cErr := google.StartClient(wf, google.GetClientScope())
+	Tok, cErr := google.Login(wf, google.GetClientScope())
 	if cErr != nil {
 		log.Fatalln("Login Error:", cErr)
 	}
 
 	// Get Identity
 	log.Println("Get Identity")
-	iStr, iErr := google.GetIdentity()
+	iTok, iErr := google.GetIdentity(Tok)
 	if iErr != nil {
 		log.Fatalln("Identity Error:", iErr)
 	}
-	log.Println("Token Str", iStr)
+
+	b := new(bytes.Buffer)
+	google.EncodeToken(Tok, b)
+
+	user := stat.UserStat{
+		UpdateDate: time.Now().String(),
+		Token:      b.Bytes(),
+		Email:      iTok.Email,
+		UserID:     iTok.UserId,
+	}
+	log.Println("User", user.UserID, user.Email)
 
 	// Setup Database
 	log.Println("Setup Database")
 	db := database.OpenDB("_data.db")
+
+	// Get & Write DB
+	db.WriteUserStats(&user)
 
 	// Setup Webface with Database
 	log.Println("Setup Webface with Database")

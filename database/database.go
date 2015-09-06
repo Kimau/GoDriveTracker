@@ -325,6 +325,69 @@ func (st *StatTrackerDB) LoadNextDailyStat(shortDate string) *stat.DailyStat {
 	return &result
 }
 
+func (st *StatTrackerDB) WriteUserStats(fStat *stat.UserStat) {
+	writeFunc := func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists(bucketUser)
+		if err != nil {
+			log.Println("Bucket failed:", err)
+			return err
+		}
+
+		dat, eMarshal := json.Marshal(fStat)
+		if eMarshal != nil {
+			log.Println("Marhsal failed:", eMarshal)
+			return eMarshal
+		}
+
+		ePut := bucket.Put([]byte(fStat.UserID), dat)
+		if ePut != nil {
+			log.Println("Put failed:", ePut)
+			return ePut
+		}
+
+		return nil
+	}
+
+	// store some data
+	txErr := st.db.Update(writeFunc)
+	if txErr != nil {
+		log.Fatal(txErr)
+	}
+}
+
+func (st *StatTrackerDB) LoadUserStats(fileId string) *stat.UserStat {
+	var result stat.UserStat
+
+	loadFunc := func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketUser)
+		if bucket == nil {
+			log.Printf("Bucket %q not found!", bucketUser)
+			return errors.New("Bucket not found!")
+		}
+
+		dat := bucket.Get([]byte(fileId))
+		if dat == nil {
+			return errors.New("File not found")
+		}
+
+		errMarshal := json.Unmarshal(dat, &result)
+		if errMarshal != nil {
+			log.Println("Unmarshal failed:", errMarshal)
+			return errMarshal
+		}
+
+		return nil
+	}
+
+	// retrieve the data
+	txErr := st.db.View(loadFunc)
+	if txErr != nil {
+		return nil
+	}
+
+	return &result
+}
+
 func (st *StatTrackerDB) WriteFileStats(fStat *stat.DocStat) {
 	writeFunc := func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists(bucketDocStats)

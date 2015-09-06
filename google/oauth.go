@@ -1,22 +1,21 @@
 package google
 
 import (
-	"fmt"
 	"net/http"
-	// oauth "google.golang.org/api/oauth2/v2"
+
+	oauth "golang.org/x/oauth2"
+	oauthGoogle "google.golang.org/api/oauth2/v2"
 )
 
-func GetIdentity() (string, error) {
+func GetIdentity(Token *oauth.Token) (*oauthGoogle.Tokeninfo, error) {
 	tokenCall := oauthSvc.Tokeninfo()
 	tokenCall.AccessToken(Token.AccessToken)
 	token, err := tokenCall.Do()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	outStr := fmt.Sprintf("AccessType: %s, \n Email: %s, \n UserId: %s, \n", token.AccessType, token.Email, token.UserId)
-
-	return outStr, nil
+	return token, nil
 }
 
 func GetAuth(getUrl string) (resp *http.Response, err error) {

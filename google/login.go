@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -25,9 +26,9 @@ type ClientSecret struct {
 	Secret string `json:"client_secret"`
 }
 
-var Token *oauth2.Token
+func Login(wf *web.WebFace, clientScopes []string) (*oauth2.Token, error) {
+	var Token *oauth2.Token
 
-func StartClient(wf *web.WebFace, clientScopes []string) (*http.Client, error) {
 	// X
 	secret, err := loadClientSecret("_secret.json")
 	if err != nil {
@@ -43,11 +44,24 @@ func StartClient(wf *web.WebFace, clientScopes []string) (*http.Client, error) {
 	}
 
 	ctx := context.Background()
-	c := newOAuthClient(ctx, config, wf)
+
+	{
+		var err error
+		cacheFile := tokenCacheFile(config)
+		Token, err = tokenFromFile(cacheFile)
+		if err != nil {
+			Token = tokenFromWeb(ctx, config, wf)
+			saveToken(cacheFile, Token)
+		} else {
+			log.Printf("Using cached token")
+		}
+	}
+
+	c := config.Client(ctx, Token)
 
 	setupClients(c)
 
-	return c, nil
+	return Token, nil
 }
 
 func loadClientSecret(filename string) (*ClientSecret, error) {
@@ -79,9 +93,10 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	t := new(oauth2.Token)
-	err = gob.NewDecoder(f).Decode(t)
-	return t, err
+	defer f.Close()
+
+	token, err := DecodeToken(f)
+	return token, err
 }
 
 func saveToken(file string, token *oauth2.Token) {
@@ -91,21 +106,17 @@ func saveToken(file string, token *oauth2.Token) {
 		return
 	}
 	defer f.Close()
-	gob.NewEncoder(f).Encode(token)
+	EncodeToken(token, f)
 }
 
-func newOAuthClient(ctx context.Context, config *oauth2.Config, wf *web.WebFace) *http.Client {
-	var err error
-	cacheFile := tokenCacheFile(config)
-	Token, err = tokenFromFile(cacheFile)
-	if err != nil {
-		Token = tokenFromWeb(ctx, config, wf)
-		saveToken(cacheFile, Token)
-	} else {
-		log.Printf("Using cached token")
-	}
+func EncodeToken(tok *oauth2.Token, dst io.Writer) {
+	gob.NewEncoder(dst).Encode(tok)
+}
 
-	return config.Client(ctx, Token)
+func DecodeToken(src io.Reader) (*oauth2.Token, error) {
+	token := new(oauth2.Token)
+	err := gob.NewDecoder(src).Decode(token)
+	return token, err
 }
 
 func tokenFromWeb(ctx context.Context, config *oauth2.Config, wf *web.WebFace) *oauth2.Token {

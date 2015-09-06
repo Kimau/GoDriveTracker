@@ -76,7 +76,8 @@ func GetSortDriveList(db *database.StatTrackerDB) error {
 	var files []*drive.File
 	{
 		var err error
-		files, err = google.AllFiles("mimeType = 'application/vnd.google-apps.document'")
+		c := make(chan int)
+		files, err = google.AllFiles("mimeType = 'application/vnd.google-apps.document'", c)
 		if err != nil {
 			log.Fatalln("Failed to get File List", err)
 			return err

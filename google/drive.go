@@ -23,7 +23,7 @@ func AllRevisions(fileId string) ([]*drive.Revision, error) {
 }
 
 // AllFiles fetches and displays all files
-func AllFiles(query string) ([]*drive.File, error) {
+func AllFiles(query string, pageNum chan int) ([]*drive.File, error) {
 	var fs []*drive.File
 	pageToken := ""
 	count := 0
@@ -40,6 +40,7 @@ func AllFiles(query string) ([]*drive.File, error) {
 			q = q.PageToken(pageToken)
 		}
 
+		pageNum <- count
 		<-driveThrottle // rate Limit
 		r, err := q.Do()
 		if err != nil {
