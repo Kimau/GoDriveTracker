@@ -137,10 +137,7 @@ func tokenFromWeb(ctx context.Context, config *oauth2.Config, wf *web.WebFace) *
 			}
 
 			if code := req.FormValue("code"); code != "" {
-				wf.RedirectHandler = func(rw http.ResponseWriter, req *http.Request) {
-
-				}
-
+				wf.RedirectHandler = nil
 				http.Redirect(rw, req, "http://"+wf.Addr+"/", 302)
 				ch <- code
 				return

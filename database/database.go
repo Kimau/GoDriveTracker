@@ -12,6 +12,7 @@ import (
 	drive "google.golang.org/api/drive/v2" // DO NOT LIKE THIS! Want to encapse this in google package
 )
 
+var bucketUser = []byte("user")
 var bucketDoc = []byte("doc")
 var bucketRevs = []byte("revs")
 var bucketDocStats = []byte("stats")
@@ -229,8 +230,7 @@ func (st *StatTrackerDB) LoadNextRevision(fileId string, revID string) *drive.Re
 		} else {
 			return errors.New("No more revisions")
 		}
-
-		return nil
+		// Unreachable
 	}
 
 	// retrieve the data

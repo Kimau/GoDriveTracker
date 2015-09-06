@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
@@ -17,8 +18,12 @@ import (
 
 type CommandFunc func() error
 
-// Flags
+const ()
+
 var (
+	addr         = flag.String("addr", "127.0.0.1:1667", "Web Address")
+	staticFldr   = flag.String("static", "./static", "Static Folder")
+	templateFldr = flag.String("template", "./templates", "Templates Folder")
 	debug        = flag.Bool("debug", false, "show HTTP traffic")
 	commandFuncs = make(map[string]CommandFunc)
 )
@@ -48,33 +53,46 @@ func init() {
 func main() {
 	commandFuncs["clear"]()
 	flag.Parse()
-
-	db := database.OpenDB("_data.db")
-
-	wf := web.MakeWebFace("127.0.0.1:1667", "./static", "./templates")
-	SetupWebFace(wf, db)
-
 	if *debug {
 		log.Println("Debug Active")
 	}
 
-	_, cErr := google.StartClient(wf, google.GetClientScope())
-	if cErr != nil {
-		log.Fatalln(cErr)
+	// Start Web Server
+	log.Println("Start Web Server")
+	wf := web.MakeWebFace(*addr, *staticFldr, *templateFldr)
+	wf.RedirectHandler = func(rw http.ResponseWriter, req *http.Request) {
+		fmt.Fprintf(rw, "Starting Server on %s", *addr)
 	}
 
+	// Login
+	log.Println("Login")
+	_, cErr := google.StartClient(wf, google.GetClientScope())
+	if cErr != nil {
+		log.Fatalln("Login Error:", cErr)
+	}
+
+	// Get Identity
+	log.Println("Get Identity")
 	iStr, iErr := google.GetIdentity()
 	if iErr != nil {
-		log.Fatalln(iErr)
+		log.Fatalln("Identity Error:", iErr)
 	}
 	log.Println("Token Str", iStr)
 
-	//DumpDocListKeys()
-	//LoadFileDumpStats("1tD8oE8lgA06p39utoNP_NCE-kToLaws46SCiWKbpi68")
-	//FullFileSweep()
-	//FullFileStatPrintout()
+	// Setup Database
+	log.Println("Setup Database")
+	db := database.OpenDB("_data.db")
+
+	// Setup Webface with Database
+	log.Println("Setup Webface with Database")
+	SetupWebFace(wf, db)
+
+	// Running Loop
+	log.Println("Running Loop")
 	commandLoop()
 
+	// Clean up
+	log.Println("Clean up")
 	db.CloseDB()
 }
 

@@ -32,7 +32,7 @@ func FullFileSweep(db *database.StatTrackerDB) error {
 
 			revStat := stat.RevStat{RevId: rev.Id, WordCount: wTotal, ModDate: rev.ModifiedDate}
 			for k, v := range wCount {
-				revStat.WordFreq = append(revStat.WordFreq, stat.WordPair{k, v})
+				revStat.WordFreq = append(revStat.WordFreq, stat.WordPair{Word: k, Count: v})
 			}
 			sort.Sort(stat.WordPairByVol(revStat.WordFreq))
 			dStat.RevList = append(dStat.RevList, revStat)
