@@ -99,6 +99,9 @@ func main() {
 	// Get & Write DB
 	db.WriteUserStats(&user)
 
+	// Init DB
+	SetupDatabase(wf, db)
+
 	// Setup Webface with Database
 	log.Println("Setup Webface with Database")
 	SetupWebFace(wf, db)

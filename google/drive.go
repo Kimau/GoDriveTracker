@@ -53,5 +53,7 @@ func AllFiles(query string, pageNum chan int) ([]*drive.File, error) {
 			break
 		}
 	}
+
+	pageNum <- -1
 	return fs, nil
 }
