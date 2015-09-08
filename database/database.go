@@ -155,176 +155,6 @@ func (st *StatTrackerDB) WriteRevision(fileId string, rev *drive.Revision) {
 	}
 }
 
-func (st *StatTrackerDB) LoadNextFile(fileId string) *drive.File {
-	var result drive.File
-
-	seekKey := []byte(fileId)
-
-	loadFunc := func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(bucketDoc)
-		if bucket == nil {
-			log.Printf("Bucket %q not found!", bucketDoc)
-			return errors.New("Bucket not found!")
-		}
-
-		c := bucket.Cursor()
-		k, v := c.First()
-		if len(fileId) > 0 {
-			k, v = c.Seek(seekKey)
-			k, v = c.Next()
-		}
-
-		if k == nil {
-			return errors.New("No more Files")
-		}
-
-		errMarshal := json.Unmarshal(v, &result)
-		if errMarshal != nil {
-			log.Println("Unmarshal failed:", errMarshal)
-			return errMarshal
-		}
-		return nil
-	}
-
-	// retrieve the data
-	txErr := st.db.View(loadFunc)
-	if txErr != nil {
-		// log.Fatalln(txErr)
-		return nil
-	}
-
-	return &result
-}
-
-func (st *StatTrackerDB) LoadNextRevision(fileId string, revID string) *drive.Revision {
-	var result drive.Revision
-
-	seekKey := []byte(fileId + " " + revID)
-
-	loadFunc := func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(bucketRevs)
-		if bucket == nil {
-			log.Printf("Bucket %q not found!", bucketRevs)
-			return errors.New("Bucket not found!")
-		}
-
-		c := bucket.Cursor()
-		c.First()
-		k, v := c.Seek(seekKey)
-		if revID != "" {
-			k, v = c.Next()
-		}
-
-		if k == nil {
-			return errors.New("No more revisions")
-		}
-		kStr := string(k)
-
-		if strings.HasPrefix(kStr, fileId) {
-			errMarshal := json.Unmarshal(v, &result)
-			if errMarshal != nil {
-				log.Println("Unmarshal failed:", errMarshal)
-				return errMarshal
-			}
-			return nil
-		} else {
-			return errors.New("No more revisions")
-		}
-		// Unreachable
-	}
-
-	// retrieve the data
-	txErr := st.db.View(loadFunc)
-	if txErr != nil {
-		// log.Fatalln(txErr)
-		return nil
-	}
-
-	return &result
-}
-
-func (st *StatTrackerDB) LoadNextFileStat(fileId string) *stat.DocStat {
-	var result stat.DocStat
-
-	seekKey := []byte(fileId)
-
-	loadFunc := func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(bucketDocStats)
-		if bucket == nil {
-			log.Printf("Bucket %q not found!", bucketDocStats)
-			return errors.New("Bucket not found!")
-		}
-
-		c := bucket.Cursor()
-		k, v := c.First()
-		if len(fileId) > 0 {
-			k, v = c.Seek(seekKey)
-			k, v = c.Next()
-		}
-
-		if k == nil {
-			return errors.New("No more Doc Stats")
-		}
-
-		errMarshal := json.Unmarshal(v, &result)
-		if errMarshal != nil {
-			log.Println("Unmarshal failed:", errMarshal)
-			return errMarshal
-		}
-		return nil
-	}
-
-	// retrieve the data
-	txErr := st.db.View(loadFunc)
-	if txErr != nil {
-		// log.Fatalln(txErr)
-		return nil
-	}
-
-	return &result
-}
-
-func (st *StatTrackerDB) LoadNextDailyStat(shortDate string) *stat.DailyStat {
-	var result stat.DailyStat
-
-	seekKey := []byte(shortDate)
-
-	loadFunc := func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(bucketDaily)
-		if bucket == nil {
-			log.Printf("Bucket %q not found!", bucketDaily)
-			return errors.New("Bucket not found!")
-		}
-
-		c := bucket.Cursor()
-		k, v := c.First()
-		if len(shortDate) > 0 {
-			k, v = c.Seek(seekKey)
-			k, v = c.Next()
-		}
-
-		if k == nil {
-			return errors.New("No more Faily Stats")
-		}
-
-		errMarshal := json.Unmarshal(v, &result)
-		if errMarshal != nil {
-			log.Println("Unmarshal failed:", errMarshal)
-			return errMarshal
-		}
-		return nil
-	}
-
-	// retrieve the data
-	txErr := st.db.View(loadFunc)
-	if txErr != nil {
-		// log.Fatalln(txErr)
-		return nil
-	}
-
-	return &result
-}
-
 func (st *StatTrackerDB) WriteUserStats(fStat *stat.UserStat) {
 	writeFunc := func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists(bucketUser)
@@ -508,6 +338,217 @@ func (st *StatTrackerDB) LoadDailyStats(shortDate string) *stat.DailyStat {
 	// retrieve the data
 	txErr := st.db.View(loadFunc)
 	if txErr != nil {
+		return nil
+	}
+
+	return &result
+}
+
+func (st *StatTrackerDB) LoadNextFile(fileId string) *drive.File {
+	var result drive.File
+
+	seekKey := []byte(fileId)
+
+	loadFunc := func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketDoc)
+		if bucket == nil {
+			log.Printf("Bucket %q not found!", bucketDoc)
+			return errors.New("Bucket not found!")
+		}
+
+		c := bucket.Cursor()
+		k, v := c.First()
+		if len(fileId) > 0 {
+			k, v = c.Seek(seekKey)
+			k, v = c.Next()
+		}
+
+		if k == nil {
+			return errors.New("No more Files")
+		}
+
+		errMarshal := json.Unmarshal(v, &result)
+		if errMarshal != nil {
+			log.Println("Unmarshal failed:", errMarshal)
+			return errMarshal
+		}
+		return nil
+	}
+
+	// retrieve the data
+	txErr := st.db.View(loadFunc)
+	if txErr != nil {
+		// log.Fatalln(txErr)
+		return nil
+	}
+
+	return &result
+}
+
+func (st *StatTrackerDB) LoadNextRevision(fileId string, revID string) *drive.Revision {
+	var result drive.Revision
+
+	seekKey := []byte(fileId + " " + revID)
+
+	loadFunc := func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketRevs)
+		if bucket == nil {
+			log.Printf("Bucket %q not found!", bucketRevs)
+			return errors.New("Bucket not found!")
+		}
+
+		c := bucket.Cursor()
+		c.First()
+		k, v := c.Seek(seekKey)
+		if revID != "" {
+			k, v = c.Next()
+		}
+
+		if k == nil {
+			return errors.New("No more revisions")
+		}
+		kStr := string(k)
+
+		if strings.HasPrefix(kStr, fileId) {
+			errMarshal := json.Unmarshal(v, &result)
+			if errMarshal != nil {
+				log.Println("Unmarshal failed:", errMarshal)
+				return errMarshal
+			}
+			return nil
+		} else {
+			return errors.New("No more revisions")
+		}
+		// Unreachable
+	}
+
+	// retrieve the data
+	txErr := st.db.View(loadFunc)
+	if txErr != nil {
+		// log.Fatalln(txErr)
+		return nil
+	}
+
+	return &result
+}
+
+func (st *StatTrackerDB) LoadNextFileStat(fileId string) *stat.DocStat {
+	var result stat.DocStat
+
+	seekKey := []byte(fileId)
+
+	loadFunc := func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketDocStats)
+		if bucket == nil {
+			log.Printf("Bucket %q not found!", bucketDocStats)
+			return errors.New("Bucket not found!")
+		}
+
+		c := bucket.Cursor()
+		k, v := c.First()
+		if len(fileId) > 0 {
+			k, v = c.Seek(seekKey)
+			k, v = c.Next()
+		}
+
+		if k == nil {
+			return errors.New("No more Doc Stats")
+		}
+
+		errMarshal := json.Unmarshal(v, &result)
+		if errMarshal != nil {
+			log.Println("Unmarshal failed:", errMarshal)
+			return errMarshal
+		}
+		return nil
+	}
+
+	// retrieve the data
+	txErr := st.db.View(loadFunc)
+	if txErr != nil {
+		// log.Fatalln(txErr)
+		return nil
+	}
+
+	return &result
+}
+
+func (st *StatTrackerDB) LoadNextDailyStat(shortDate string) *stat.DailyStat {
+	var result stat.DailyStat
+
+	seekKey := []byte(shortDate)
+
+	loadFunc := func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketDaily)
+		if bucket == nil {
+			log.Printf("Bucket %q not found!", bucketDaily)
+			return errors.New("Bucket not found!")
+		}
+
+		c := bucket.Cursor()
+		k, v := c.First()
+		if len(shortDate) > 0 {
+			k, v = c.Seek(seekKey)
+			k, v = c.Next()
+		}
+
+		if k == nil {
+			return errors.New("No more Faily Stats")
+		}
+
+		errMarshal := json.Unmarshal(v, &result)
+		if errMarshal != nil {
+			log.Println("Unmarshal failed:", errMarshal)
+			return errMarshal
+		}
+		return nil
+	}
+
+	// retrieve the data
+	txErr := st.db.View(loadFunc)
+	if txErr != nil {
+		// log.Fatalln(txErr)
+		return nil
+	}
+
+	return &result
+}
+
+func (st *StatTrackerDB) LoadNextUser(userID string) *stat.UserStat {
+	var result stat.UserStat
+
+	seekKey := []byte(userID)
+
+	loadFunc := func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketUser)
+		if bucket == nil {
+			log.Printf("Bucket %q not found!", bucketUser)
+			return errors.New("Bucket not found!")
+		}
+
+		c := bucket.Cursor()
+		k, v := c.First()
+		if len(userID) > 0 {
+			k, v = c.Seek(seekKey)
+			k, v = c.Next()
+		}
+
+		if k == nil {
+			return errors.New("No more Faily Stats")
+		}
+
+		errMarshal := json.Unmarshal(v, &result)
+		if errMarshal != nil {
+			log.Println("Unmarshal failed:", errMarshal)
+			return errMarshal
+		}
+		return nil
+	}
+
+	// retrieve the data
+	txErr := st.db.View(loadFunc)
+	if txErr != nil {
+		// log.Fatalln(txErr)
 		return nil
 	}
 

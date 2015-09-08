@@ -74,33 +74,41 @@ func main() {
 		log.Fatalln("Login Error:", cErr)
 	}
 
-	// Get Identity
-	log.Println("Get Identity")
-	iTok, iErr := google.GetIdentity(Tok)
-	if iErr != nil {
-		log.Fatalln("Identity Error:", iErr)
-	}
-
-	b := new(bytes.Buffer)
-	google.EncodeToken(Tok, b)
-
-	user := stat.UserStat{
-		UpdateDate: time.Now().String(),
-		Token:      b.Bytes(),
-		Email:      iTok.Email,
-		UserID:     iTok.UserId,
-	}
-	log.Println("User", user.UserID, user.Email)
-
 	// Setup Database
 	log.Println("Setup Database")
 	db := database.OpenDB("_data.db")
 
-	// Get & Write DB
-	db.WriteUserStats(&user)
+	// Get Identity
+	log.Println("Get Identity")
+	userStat := db.LoadNextUser("")
 
-	// Init DB
-	SetupDatabase(wf, db)
+	// First Time Load
+	if userStat == nil {
+		log.Println("===== FRESH DATABSE SETUP =====")
+
+		iTok, iErr := google.GetIdentity(Tok)
+		if iErr != nil {
+			log.Fatalln("Identity Error:", iErr)
+		}
+
+		b := new(bytes.Buffer)
+		google.EncodeToken(Tok, b)
+
+		userStat := stat.UserStat{
+			UpdateDate: time.Now().String(),
+			Token:      b.Bytes(),
+			Email:      iTok.Email,
+			UserID:     iTok.UserId,
+		}
+
+		// Get & Write DB
+		db.WriteUserStats(&userStat)
+
+		// Init DB
+		SetupDatabase(wf, db)
+	}
+
+	log.Println("User", userStat.UserID, userStat.Email)
 
 	// Setup Webface with Database
 	log.Println("Setup Webface with Database")
