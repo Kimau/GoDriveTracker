@@ -3,17 +3,62 @@
 <head>
   <title>Summary</title>
 </head>
+<style type="text/css">
+.year{
+	
+    border: 4px solid #2D2727;
+    text-align: center;
+    vertical-align: top;
+    width: 700px;
+    margin: 10px;
+  } 
+
+.month{    
+	    display: inline-block;
+    width: 146px;
+    text-align: left;
+    vertical-align: top;
+} 
+
+.day{
+	display: inline-block;
+	width: 20px;
+  height: 20px;
+  background: #EEE;
+  overflow: hidden;
+}
+
+.day.data{
+	background: #DFD;
+}
+
+h2 {
+    text-align: center;
+}
+
+</style>
 <body>
 
 <h3>Days Recorded</h3>
+
 {{range $index, $element := .}}
-  <li>
-  	{{$index}} 
-  	{{if $element}}
-  		<span class="add">{{$element.WordAdd}}</span>
-  		<span class="sub">{{$element.WordSub}}</span>
-  	{{end}}
-  </li>
+<div class="year y{{$index}}">
+<h1>{{$index}}</h1>
+	{{range $index, $element := .}}
+	<div class="month m{{$index}}">
+	<h2>{{$index}}</h2>
+		{{range $index, $element := .}}
+			<div class="day d{{$index}} {{if $element}}data{{end}}">
+			<h3>{{$index}}</h3>
+			{{if $element}}
+	  		<span class="add">{{$element.WordAdd}}</span>
+	  		<span class="sub">{{$element.WordSub}}</span>
+	  	{{end}}
+	  	</div>
+	  {{end}}
+	 </div>
+	 {{end}}
+</div>
 {{end}}
 
 </body>

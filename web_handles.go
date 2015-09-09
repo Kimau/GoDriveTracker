@@ -16,12 +16,34 @@ import (
 
 var (
 	rePathMatch = regexp.MustCompile("/day/([0-9]+)[/\\-]([0-9]+)[/\\-]([0-9]+)")
-	dayList     = make(map[string]*stat.DailyStat)
+	dayList     = map[int]map[int]map[int]*stat.DailyStat{}
 )
 
 const (
 	dateFormat = "2006-01-02"
 )
+
+func SetDayListDay(dateKey time.Time, data *stat.DailyStat) {
+	var ok bool
+	var year map[int]map[int]*stat.DailyStat
+	var month map[int]*stat.DailyStat
+
+	yKey := -dateKey.Year()
+	year, ok = dayList[yKey]
+	if !ok {
+		dayList[yKey] = make(map[int]map[int]*stat.DailyStat)
+		year = dayList[yKey]
+	}
+
+	mKey := -int(dateKey.Month())
+	month, ok = year[mKey]
+	if !ok {
+		year[mKey] = make(map[int]*stat.DailyStat)
+		month = year[mKey]
+	}
+
+	month[dateKey.Day()] = data
+}
 
 func SetupWebFace(wf *web.WebFace, dbPtr *database.StatTrackerDB) {
 	wf.Router.Handle("/", SummaryHandle{db: dbPtr})
@@ -41,16 +63,22 @@ func SetupWebFace(wf *web.WebFace, dbPtr *database.StatTrackerDB) {
 		}
 
 		for prevDate.Before(newDate) {
+			SetDayListDay(prevDate, nil)
 			prevDate = prevDate.AddDate(0, 0, 1)
-			dayList[prevDate.Format(dateFormat)] = nil
 		}
 
 		// Setup Day
-		dayList[d.ModDate] = d
+		SetDayListDay(prevDate, d)
+		prevDate = prevDate.AddDate(0, 0, 1)
 
 		// Onto Next Date
-		prevDate = newDate
 		d = dbPtr.LoadNextDailyStat(d.ModDate)
+	}
+
+	newDate := time.Now()
+	for prevDate.Before(newDate) {
+		SetDayListDay(prevDate, nil)
+		prevDate = prevDate.AddDate(0, 0, 1)
 	}
 }
 
