@@ -16,40 +16,40 @@ import (
 
 var (
 	rePathMatch = regexp.MustCompile("/day/([0-9]+)[/\\-]([0-9]+)[/\\-]([0-9]+)")
-	dayList     = map[int]map[int]map[int]*stat.DailyStat{}
 )
 
 const (
 	dateFormat = "2006-01-02"
 )
 
-func SetDayListDay(dateKey time.Time, data *stat.DailyStat) {
-	var ok bool
-	var year map[int]map[int]*stat.DailyStat
-	var month map[int]*stat.DailyStat
+func SetupWebFace(wf *web.WebFace, dbPtr *database.StatTrackerDB) {
+	sh := SummaryHandle{db: dbPtr}
+	sh.Setup()
+	wf.Router.Handle("/", sh)
 
-	yKey := -dateKey.Year()
-	year, ok = dayList[yKey]
-	if !ok {
-		dayList[yKey] = make(map[int]map[int]*stat.DailyStat)
-		year = dayList[yKey]
-	}
-
-	mKey := -int(dateKey.Month())
-	month, ok = year[mKey]
-	if !ok {
-		year[mKey] = make(map[int]*stat.DailyStat)
-		month = year[mKey]
-	}
-
-	month[dateKey.Day()] = data
+	wf.Router.Handle("/day/", DayHandle{db: dbPtr})
 }
 
-func SetupWebFace(wf *web.WebFace, dbPtr *database.StatTrackerDB) {
-	wf.Router.Handle("/", SummaryHandle{db: dbPtr})
-	wf.Router.Handle("/day/", DayHandle{db: dbPtr})
+////////////////////////////////////////////////////////////////////////////////
+// Summary Handle
+type gPoint struct {
+	X   int
+	Y   int
+	Add int
+	Sub int
+}
 
-	d := dbPtr.LoadNextDailyStat("")
+type SummaryHandle struct {
+	db          *database.StatTrackerDB
+	DayList     map[int]map[time.Month]map[int]*stat.DailyStat
+	LatestGraph []gPoint
+}
+
+func (sh *SummaryHandle) Setup() {
+	sh.DayList = make(map[int]map[time.Month]map[int]*stat.DailyStat)
+
+	// Sumary Setup
+	d := sh.db.LoadNextDailyStat("")
 	prevDate, dErr := time.Parse(dateFormat, d.ModDate)
 	if dErr != nil {
 		log.Fatalln("Cannot parse:", d)
@@ -63,29 +63,98 @@ func SetupWebFace(wf *web.WebFace, dbPtr *database.StatTrackerDB) {
 		}
 
 		for prevDate.Before(newDate) {
-			SetDayListDay(prevDate, nil)
+			sh.SetDayListDay(prevDate, nil)
 			prevDate = prevDate.AddDate(0, 0, 1)
 		}
 
 		// Setup Day
-		SetDayListDay(prevDate, d)
+		sh.SetDayListDay(prevDate, d)
 		prevDate = prevDate.AddDate(0, 0, 1)
 
 		// Onto Next Date
-		d = dbPtr.LoadNextDailyStat(d.ModDate)
+		d = sh.db.LoadNextDailyStat(d.ModDate)
 	}
 
 	newDate := time.Now()
 	for prevDate.Before(newDate) {
-		SetDayListDay(prevDate, nil)
+		sh.SetDayListDay(prevDate, nil)
 		prevDate = prevDate.AddDate(0, 0, 1)
+	}
+
+	// Graph Setup
+	sh.LatestGraph = []gPoint{}
+	newDate = newDate.AddDate(0, 0, -100)
+	for i := 0; i < 100; i += 1 {
+		d := sh.GetDayListDay(newDate)
+		if d != nil {
+			sh.LatestGraph = append(sh.LatestGraph, gPoint{
+				X:   i * 8,
+				Y:   200 - d.WordAdd/10,
+				Add: d.WordAdd / 10,
+				Sub: d.WordSub / 10})
+		} else {
+			sh.LatestGraph = append(sh.LatestGraph, gPoint{
+				X:   i * 8,
+				Y:   200,
+				Add: 0,
+				Sub: 0})
+		}
+		newDate = newDate.AddDate(0, 0, 1)
 	}
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Summary Handle
-type SummaryHandle struct {
-	db *database.StatTrackerDB
+func (sh *SummaryHandle) GetDayListDay(dateKey time.Time) *stat.DailyStat {
+	var ok bool
+	var year map[time.Month]map[int]*stat.DailyStat
+	var month map[int]*stat.DailyStat
+
+	yKey := -dateKey.Year()
+	year, ok = sh.DayList[yKey]
+	if !ok {
+		return nil
+	}
+
+	mKey := dateKey.Month()
+	month, ok = year[mKey]
+	if !ok {
+		return nil
+	}
+
+	return month[dateKey.Day()]
+}
+
+func (sh *SummaryHandle) SetDayListDay(dateKey time.Time, data *stat.DailyStat) {
+	var ok bool
+	var year map[time.Month]map[int]*stat.DailyStat
+	var month map[int]*stat.DailyStat
+
+	yKey := -dateKey.Year()
+	year, ok = sh.DayList[yKey]
+	if !ok {
+		sh.DayList[yKey] = make(map[time.Month]map[int]*stat.DailyStat)
+		year = sh.DayList[yKey]
+	}
+
+	mKey := dateKey.Month()
+	month, ok = year[mKey]
+	if !ok {
+		year[mKey] = make(map[int]*stat.DailyStat)
+		month = year[mKey]
+
+		firstDay := time.Date(dateKey.Year(), dateKey.Month(), 1, 0, 0, 0, 0, time.UTC).Weekday()
+		dayOff := 1
+		for firstDay != time.Monday {
+			dayOff -= 1
+			month[dayOff] = nil
+			if firstDay == time.Sunday {
+				firstDay = time.Saturday
+			} else {
+				firstDay -= 1
+			}
+		}
+	}
+
+	month[dateKey.Day()] = data
 }
 
 func (sh SummaryHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -93,7 +162,10 @@ func (sh SummaryHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Fatalln("Error parsing:", err)
 	}
-	sumTemp.Execute(rw, dayList)
+	e := sumTemp.Execute(rw, sh)
+	if e != nil {
+		log.Println("Error in Temp", e)
+	}
 	/*
 		for dayStat := sh.db.LoadNextDailyStat(""); dayStat != nil; dayStat = sh.db.LoadNextDailyStat(dayStat.ModDate) {
 			fmt.Fprintf(rw, `<div><a href="/day/%s">%s</a> you wrote %d words and deleted %d words.</div>`, dayStat.ModDate, dayStat.ModDate, dayStat.WordAdd, dayStat.WordSub)
