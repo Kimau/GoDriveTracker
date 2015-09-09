@@ -2,21 +2,56 @@ package main
 
 import (
 	"fmt"
+	"html/template"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
+	"time"
 
 	"./database"
+	"./stat"
 	"./web"
 )
 
 var (
 	rePathMatch = regexp.MustCompile("/day/([0-9]+)[/\\-]([0-9]+)[/\\-]([0-9]+)")
+	dayList     = make(map[string]*stat.DailyStat)
+)
+
+const (
+	dateFormat = "2006-01-02"
 )
 
 func SetupWebFace(wf *web.WebFace, dbPtr *database.StatTrackerDB) {
 	wf.Router.Handle("/", SummaryHandle{db: dbPtr})
 	wf.Router.Handle("/day/", DayHandle{db: dbPtr})
+
+	d := dbPtr.LoadNextDailyStat("")
+	prevDate, dErr := time.Parse(dateFormat, d.ModDate)
+	if dErr != nil {
+		log.Fatalln("Cannot parse:", d)
+	}
+
+	for d != nil {
+		// Skip Ahread Days
+		newDate, nErr := time.Parse(dateFormat, d.ModDate)
+		if nErr != nil {
+			log.Fatalln("Cannot parse:", nErr, d)
+		}
+
+		for prevDate.Before(newDate) {
+			prevDate = prevDate.AddDate(0, 0, 1)
+			dayList[prevDate.Format(dateFormat)] = nil
+		}
+
+		// Setup Day
+		dayList[d.ModDate] = d
+
+		// Onto Next Date
+		prevDate = newDate
+		d = dbPtr.LoadNextDailyStat(d.ModDate)
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -26,9 +61,15 @@ type SummaryHandle struct {
 }
 
 func (sh SummaryHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	for dayStat := sh.db.LoadNextDailyStat(""); dayStat != nil; dayStat = sh.db.LoadNextDailyStat(dayStat.ModDate) {
-		fmt.Fprintf(rw, `<div><a href="/day/%s">%s</a> you wrote %d words and deleted %d words.</div>`, dayStat.ModDate, dayStat.ModDate, dayStat.WordAdd, dayStat.WordSub)
+	sumTemp, err := template.ParseFiles("summary.html")
+	if err != nil {
+		log.Fatalln("Error parsing:", err)
 	}
+	sumTemp.Execute(rw, dayList)
+	/*
+		for dayStat := sh.db.LoadNextDailyStat(""); dayStat != nil; dayStat = sh.db.LoadNextDailyStat(dayStat.ModDate) {
+			fmt.Fprintf(rw, `<div><a href="/day/%s">%s</a> you wrote %d words and deleted %d words.</div>`, dayStat.ModDate, dayStat.ModDate, dayStat.WordAdd, dayStat.WordSub)
+		}*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////

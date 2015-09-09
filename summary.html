@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Summary</title>
+</head>
+<body>
+
+<h3>Days Recorded</h3>
+{{range $index, $element := .}}
+  <li>
+  	{{$index}} 
+  	{{if $element}}
+  		<span class="add">{{$element.WordAdd}}</span>
+  		<span class="sub">{{$element.WordSub}}</span>
+  	{{end}}
+  </li>
+{{end}}
+
+</body>
+</html>

@@ -113,6 +113,7 @@ func main() {
 	// Setup Webface with Database
 	log.Println("Setup Webface with Database")
 	SetupWebFace(wf, db)
+	wf.RedirectHandler = nil
 
 	// Running Loop
 	log.Println("Running Loop")
