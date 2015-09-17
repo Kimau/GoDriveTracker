@@ -94,7 +94,7 @@ func main() {
 		b := new(bytes.Buffer)
 		google.EncodeToken(Tok, b)
 
-		userStat := stat.UserStat{
+		userStat = &stat.UserStat{
 			UpdateDate: time.Now().String(),
 			Token:      b.Bytes(),
 			Email:      iTok.Email,
@@ -102,7 +102,7 @@ func main() {
 		}
 
 		// Get & Write DB
-		db.WriteUserStats(&userStat)
+		db.WriteUserStats(userStat)
 
 		// Init DB
 		SetupDatabase(wf, db)

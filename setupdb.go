@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"sort"
 
 	database "./database"
@@ -16,15 +17,17 @@ import (
 )
 
 func SetupDatabase(wf *web.WebFace, db *database.StatTrackerDB) {
-	outBuf := bytes.NewBufferString("Starting Server")
+	webBuf := bytes.NewBufferString("Starting Server")
 	fileCounter := 0
 	numFiles := 0
+
+	outBuf := io.MultiWriter(webBuf, os.Stdout)
 
 	fmt.Fprintf(outBuf, "Hosting on %s \n", *addr)
 
 	wf.RedirectHandler = func(rw http.ResponseWriter, req *http.Request) {
 		fmt.Fprintf(rw, "Files Processed: %4d/%d \n", fileCounter, numFiles)
-		fmt.Fprint(rw, outBuf)
+		fmt.Fprint(rw, webBuf)
 	}
 
 	fmt.Fprintln(outBuf, "Fetching File List")
@@ -50,10 +53,12 @@ func SetupDatabase(wf *web.WebFace, db *database.StatTrackerDB) {
 	for ifile, file := range driveFilelist {
 		fileCounter = ifile
 
-		dStat := FilePullCalc(file)
+		db.WriteFile(file)
+		dStat := FilePullCalc(file, db)
+
 		db.WriteFileStats(dStat)
 
-		fmt.Fprintf(outBuf, "Stats File Generated: [%s] %s \n", file.Id, file.Title)
+		fmt.Fprintf(outBuf, "Stats File Generated: %s... %s %s\n", file.Id[:6], dStat.LastMod[:10], file.Title)
 		docStatList = append(docStatList, dStat)
 	}
 
@@ -67,7 +72,7 @@ func CreateDailyStat(docStatList []*stat.DocStat, rw io.Writer, db *database.Sta
 	var dates = map[string]stat.DailyStat{}
 
 	for i, fileStat := range docStatList {
-		fmt.Fprintf(rw, "Collecting Daily Numbers %4d/%d \n", i)
+		fmt.Fprintf(rw, "Collecting Daily Numbers %4d/%d \n", i+1, len(docStatList))
 
 		prev := 0
 
@@ -112,8 +117,12 @@ func CreateDailyStat(docStatList []*stat.DocStat, rw io.Writer, db *database.Sta
 	//
 }
 
-func FilePullCalc(file *drive.File) *stat.DocStat {
-	dStat := stat.DocStat{FileId: file.Id, LastMod: file.ModifiedDate}
+func FilePullCalc(file *drive.File, db *database.StatTrackerDB) *stat.DocStat {
+	dStat := stat.DocStat{
+		FileId:  file.Id,
+		Title:   file.Title,
+		LastMod: file.ModifiedDate,
+	}
 
 	// Get Revisions List
 	revLists, errRev := google.AllRevisions(file.Id)
@@ -123,6 +132,8 @@ func FilePullCalc(file *drive.File) *stat.DocStat {
 	}
 
 	for _, r := range revLists {
+		db.WriteRevision(file.Id, r)
+
 		rStat := RevisionPullCalc(r)
 		dStat.RevList = append(dStat.RevList, rStat)
 	}
@@ -141,7 +152,13 @@ func RevisionPullCalc(rev *drive.Revision) stat.RevStat {
 	bodyStr := buf.String()
 	wCount, wTotal := stat.WordCount(bodyStr)
 
-	revStat := stat.RevStat{RevId: rev.Id, WordCount: wTotal, ModDate: rev.ModifiedDate}
+	revStat := stat.RevStat{
+		RevId:     rev.Id,
+		UserName:  rev.LastModifyingUserName,
+		WordCount: wTotal,
+		ModDate:   rev.ModifiedDate,
+	}
+
 	for k, v := range wCount {
 		revStat.WordFreq = append(revStat.WordFreq, stat.WordPair{Word: k, Count: v})
 	}

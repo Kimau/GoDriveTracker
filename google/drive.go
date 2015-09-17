@@ -2,7 +2,6 @@ package google
 
 import (
 	"fmt"
-	"log"
 
 	drive "google.golang.org/api/drive/v2"
 )
@@ -28,7 +27,6 @@ func AllFiles(query string, pageNum chan int) ([]*drive.File, error) {
 	pageToken := ""
 	count := 0
 	for {
-		log.Println("Getting page of file listing", count)
 		count = count + 1
 
 		q := drvSvc.Files.List()

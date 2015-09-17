@@ -49,7 +49,8 @@ func Login(wf *web.WebFace, clientScopes []string) (*oauth2.Token, error) {
 		var err error
 		cacheFile := tokenCacheFile(config)
 		Token, err = tokenFromFile(cacheFile)
-		if err != nil {
+
+		if err != nil || (time.Now().After(Token.Expiry)) {
 			Token = tokenFromWeb(ctx, config, wf)
 			saveToken(cacheFile, Token)
 		} else {

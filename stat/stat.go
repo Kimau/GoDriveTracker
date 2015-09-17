@@ -21,6 +21,7 @@ type WordPair struct {
 
 type RevStat struct {
 	RevId     string     `json:"RevId"`
+	UserName  string     `json:"UserName"`
 	WordCount int        `json:"WordCount"`
 	ModDate   string     `json:"ModDate"`
 	WordFreq  []WordPair `json:"WordFreq"`
@@ -28,6 +29,7 @@ type RevStat struct {
 
 type DocStat struct {
 	FileId  string    `json:"FileId"`
+	Title   string    `json:"Title"`
 	LastMod string    `json:"LastMod"`
 	RevList []RevStat `json:"RevList"`
 }

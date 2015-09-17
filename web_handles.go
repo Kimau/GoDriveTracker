@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"math"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -32,17 +33,28 @@ func SetupWebFace(wf *web.WebFace, dbPtr *database.StatTrackerDB) {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Summary Handle
+type svgBox struct {
+	X         int
+	Y         int
+	W         int
+	H         int
+	Classname string
+}
+
 type gPoint struct {
-	X   int
-	Y   int
-	Add int
-	Sub int
+	Stat  *stat.DailyStat
+	Boxes []svgBox
 }
 
 type SummaryHandle struct {
-	db          *database.StatTrackerDB
-	DayList     map[int]map[time.Month]map[int]*stat.DailyStat
-	LatestGraph []gPoint
+	db           *database.StatTrackerDB
+	DayList      map[int]map[time.Month]map[int]*stat.DailyStat
+	LatestGraph  []gPoint
+	GridLines    []int
+	GridDayLines []int
+	GridWidth    int
+	GridHeight   int
+	GridHalf     int
 }
 
 func (sh *SummaryHandle) Setup() {
@@ -84,23 +96,56 @@ func (sh *SummaryHandle) Setup() {
 	// Graph Setup
 	sh.LatestGraph = []gPoint{}
 	newDate = newDate.AddDate(0, 0, -100)
+
+	sh.GridDayLines = []int{}
+	sh.GridLines = []int{}
+	sh.GridWidth = 800
+	sh.GridHeight = 300
+	sh.GridHalf = sh.GridHeight
+	XStep := sh.GridWidth / 100
+
+	yH := sh.GridHalf
+	yStep := 100
+	for y := 0; yH > 0; y += yStep {
+		yH = sh.GridHalf - int(math.Pow(float64(y), 0.7))
+		sh.GridLines = append(sh.GridLines, yH)
+
+		if y == 1000 {
+			yStep = 1000
+		}
+	}
+
 	for i := 0; i < 100; i += 1 {
 		d := sh.GetDayListDay(newDate)
 		if d != nil {
-			sh.LatestGraph = append(sh.LatestGraph, gPoint{
-				X:   i * 8,
-				Y:   200 - d.WordAdd/10,
-				Add: d.WordAdd / 10,
-				Sub: d.WordSub / 10})
-		} else {
-			sh.LatestGraph = append(sh.LatestGraph, gPoint{
-				X:   i * 8,
-				Y:   200,
-				Add: 0,
-				Sub: 0})
+			p := gPoint{
+				Stat:  d,
+				Boxes: []svgBox{},
+			}
+
+			// Add Bar
+			{
+				h := int(math.Pow(float64(d.WordAdd), 0.7))
+				p.Boxes = append(p.Boxes, svgBox{X: i * XStep, Y: sh.GridHalf - h, W: XStep, H: h, Classname: "addBar"})
+			}
+
+			// Sub Bar
+			{
+				h := int(math.Pow(float64(0-d.WordSub), 0.7))
+				p.Boxes = append(p.Boxes, svgBox{X: i * XStep, Y: sh.GridHalf - h, W: XStep, H: h, Classname: "subBar"})
+			}
+
+			sh.LatestGraph = append(sh.LatestGraph, p)
 		}
+
+		if newDate.Weekday() == time.Monday {
+			sh.GridDayLines = append(sh.GridDayLines, i*XStep)
+		}
+
 		newDate = newDate.AddDate(0, 0, 1)
 	}
+
+	fmt.Println("Setup Summary Handle")
 }
 
 func (sh *SummaryHandle) GetDayListDay(dateKey time.Time) *stat.DailyStat {
@@ -206,11 +251,17 @@ func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(rw, "On %s you wrote %d words and deleted %d words.\n", dayStat.ModDate, dayStat.WordAdd, dayStat.WordSub)
 	fmt.Fprintf(rw, "Edited %d files. \n", len(dayStat.FileRevs))
 	for k, v := range dayStat.FileRevs {
-		file := dh.db.LoadFile(k)
+		fmt.Println(k)
+		file := dh.db.LoadFileStats(k)
 		if file == nil {
-			fmt.Fprintf(rw, "> File [%s] not found [%d revisions] \n", k, len(v))
+			fmt.Fprintf(rw, "> File [%s] not found [%d revisions] ", k, len(v))
 		} else {
-			fmt.Fprintf(rw, "> %s  [%d revisions]\n", file.Title, len(v))
+			fmt.Fprintf(rw, "> %s  [%d revisions] ", file.Title, len(v))
 		}
+
+		for _, vRev := range v {
+			fmt.Fprintf(rw, "%s ", vRev)
+		}
+		fmt.Fprintf(rw, "\n")
 	}
 }
