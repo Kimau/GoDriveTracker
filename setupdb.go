@@ -157,12 +157,19 @@ func RevisionPullCalc(rev *drive.Revision) stat.RevStat {
 		UserName:  rev.LastModifyingUserName,
 		WordCount: wTotal,
 		ModDate:   rev.ModifiedDate,
+		WordFreq:  []stat.WordPair{},
 	}
 
-	for k, v := range wCount {
-		revStat.WordFreq = append(revStat.WordFreq, stat.WordPair{Word: k, Count: v})
+	if len(wCount) > 0 {
+		for k, v := range wCount {
+			revStat.WordFreq = append(revStat.WordFreq, stat.WordPair{Word: k, Count: v})
+		}
+		sort.Sort(stat.WordPairByVol(revStat.WordFreq))
+
+		if len(wCount) > 10 {
+			revStat.WordFreq = revStat.WordFreq[:10]
+		}
 	}
-	sort.Sort(stat.WordPairByVol(revStat.WordFreq))
 
 	return revStat
 }

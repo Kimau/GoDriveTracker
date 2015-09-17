@@ -123,16 +123,13 @@ func (sh *SummaryHandle) Setup() {
 				Boxes: []svgBox{},
 			}
 
-			// Add Bar
 			{
+				// Add Bar
 				h := int(math.Pow(float64(d.WordAdd), 0.7))
 				p.Boxes = append(p.Boxes, svgBox{X: i * XStep, Y: sh.GridHalf - h, W: XStep, H: h, Classname: "addBar"})
-			}
 
-			// Sub Bar
-			{
-				h := int(math.Pow(float64(0-d.WordSub), 0.7))
-				p.Boxes = append(p.Boxes, svgBox{X: i * XStep, Y: sh.GridHalf - h, W: XStep, H: h, Classname: "subBar"})
+				// Sub Bar
+				p.Boxes = append(p.Boxes, svgBox{X: i * XStep, Y: sh.GridHalf - h, W: XStep, H: int(math.Pow(float64(0-d.WordSub), 0.7)), Classname: "subBar"})
 			}
 
 			sh.LatestGraph = append(sh.LatestGraph, p)
@@ -223,6 +220,14 @@ type DayHandle struct {
 	db *database.StatTrackerDB
 }
 
+type DayData struct {
+	FullDate  string
+	Stat      *stat.DailyStat
+	WordTotal int
+	DocList   []*stat.DocStat
+	RevList   []*stat.RevStat
+}
+
 func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	matches := rePathMatch.FindAllStringSubmatch(req.URL.String(), -1)
@@ -240,7 +245,9 @@ func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	shortDate := fmt.Sprintf("%04d-%02d-%02d", year, month, day)
+	date := time.Date(year, time.Month(month), day, 12, 0, 0, 0, time.UTC)
+
+	shortDate := date.Format("2006-01-02")
 
 	dayStat := dh.db.LoadDailyStats(shortDate)
 	if dayStat == nil {
@@ -248,20 +255,38 @@ func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(rw, "On %s you wrote %d words and deleted %d words.\n", dayStat.ModDate, dayStat.WordAdd, dayStat.WordSub)
-	fmt.Fprintf(rw, "Edited %d files. \n", len(dayStat.FileRevs))
+	sumTemp, err := template.ParseFiles("dailyStat.html")
+	if err != nil {
+		log.Fatalln("Error parsing:", err)
+	}
+
+	dList := []*stat.DocStat{}
+	rList := []*stat.RevStat{}
 	for k, v := range dayStat.FileRevs {
-		fmt.Println(k)
 		file := dh.db.LoadFileStats(k)
 		if file == nil {
-			fmt.Fprintf(rw, "> File [%s] not found [%d revisions] ", k, len(v))
+			http.Error(rw, "Error finding file", 500)
 		} else {
-			fmt.Fprintf(rw, "> %s  [%d revisions] ", file.Title, len(v))
+			for _, vRevID := range v {
+				dList = append(dList, file)
+				for _, vRev := range file.RevList {
+					if vRev.RevId == vRevID {
+						rList = append(rList, &vRev)
+					}
+				}
+			}
 		}
-
-		for _, vRev := range v {
-			fmt.Fprintf(rw, "%s ", vRev)
-		}
-		fmt.Fprintf(rw, "\n")
 	}
+
+	e := sumTemp.Execute(rw, DayData{
+		FullDate:  date.Format("Monday, 2 Jan 2006"),
+		Stat:      dayStat,
+		WordTotal: dayStat.WordAdd + dayStat.WordSub,
+		DocList:   dList,
+		RevList:   rList,
+	})
+	if e != nil {
+		log.Println("Error in Temp", e)
+	}
+
 }

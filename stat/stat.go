@@ -11,7 +11,7 @@ type WordPairByVol []WordPair
 func (a WordPairByVol) Len() int      { return len(a) }
 func (a WordPairByVol) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a WordPairByVol) Less(i, j int) bool {
-	return (a[i].Count < a[j].Count)
+	return (a[i].Count > a[j].Count)
 }
 
 type WordPair struct {

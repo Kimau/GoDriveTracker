@@ -1,16 +1,34 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Daily Page: {{.LongDate}}</title>
+  <title>Daily Page: {{.FullDate}}</title>
 </head>
+<style type="text/css">
+  .add {
+    color: green;
+  }
+
+  .sub {
+    color: red;
+  }
+</style>
 <body>
 
-<h1>Wrote <span class="add">{{.AddWordCount}}</span> words</h1>
-<h2>Deleted <span class="sub">{{.SubWordCount}}</span> words</h2>
+<h1>{{.FullDate}}</h1>
+<h2>{{.WordTotal}} words</h2>
+<h3>Added <span class="add">{{.Stat.WordAdd}}</span> words</h3>
+<h3>Deleted <span class="sub">{{.Stat.WordSub}}</span> words</h3>
 
 <h3>Files Changed</h3>
-{{range .FileList}}
-  <li>{{.Title}} <span class="add">{{.AddWordCount}}</span><span class="sub">{{.SubWordCount}}</span></li>
+{{range $index, $doc := .DocList}}
+  <li>{{$doc.Title}} 
+    {{with index .RevList $index}}
+    <span>{{.UserName}}</span>
+    <span>{{.WordCount}}</span>
+    <span>{{.ModDate}}</span>
+    <div>{{range .WordFreq}}<span style="font-size:{{.Count}}pt">{{.Word}}</span> {{end}}</div>
+    {{end}}
+  </li>
 {{end}}
 
 </body>

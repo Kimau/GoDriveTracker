@@ -17,10 +17,11 @@ func WordCount(s string) (map[string]int, int) {
 	}
 
 	words := strings.FieldsFunc(s, f)
+
 	counts := make(map[string]int, len(words))
 	for _, word := range words {
 		w := strings.ToLower(strings.TrimFunc(word, trimF))
-		if len(w) > 0 {
+		if len(w) > 3 {
 			counts[w]++
 		}
 	}

@@ -90,19 +90,19 @@ border-radius: 0 5px 5px 0;
 svg .addBar { fill:#009900; }
 svg .subBar { fill: transparent; stroke:#990000; stroke-width: 0.5;}
 
-svg g text {
+svg a text {
   display: none;
 }
 
-svg g:hover text {
+svg a:hover text {
   display: block;
 }
-svg g:hover .addBar {
+svg a:hover .addBar {
   fill: #16E216;
   stroke: #009900;
   stroke-width: 1;
 }
-svg g:hover .subBar {
+svg a:hover .subBar {
   fill: #E21616;
   stroke: #990000;
 }
@@ -136,11 +136,11 @@ svg .dayLine {
 {{end}}
 
 {{range .LatestGraph}}
-<g>
+<a xlink:href="/day/{{.Stat.ModDate}}" xlink:show="replace">
   {{range .Boxes}}
 	<rect x="{{.X}}" y="{{.Y}}" width="{{.W}}" height="{{.H}}" class="{{.Classname}}" />	
   {{end}}
-</g>
+</a>
 {{end}}
 </svg>
 
