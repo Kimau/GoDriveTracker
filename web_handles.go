@@ -21,7 +21,8 @@ var (
 )
 
 const (
-	dateFormat = "2006-01-02"
+	dateFormat     = "2006-01-02"
+	dateFormatLong = "2006-01-02T15:04:05.000Z"
 )
 
 func SetupWebFace(wf *web.WebFace, dbPtr *database.StatTrackerDB) {
@@ -309,6 +310,12 @@ type FileHandle struct {
 
 func (dh FileHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
+	fileTemp, err := template.ParseFiles("./templates/fileStat.html")
+	if err != nil {
+		http.Error(rw, fmt.Sprintf("Error parsing: %s", err), 500)
+		return
+	}
+
 	matches := reFilePathMatch.FindAllStringSubmatch(req.URL.String(), -1)
 	if len(matches) < 1 {
 		fmt.Println(matches, req.URL)
@@ -322,5 +329,24 @@ func (dh FileHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	fmt.Fprint(rw, fileStat)
+	date, errDate := time.Parse(dateFormatLong, fileStat.LastMod)
+	if errDate != nil {
+		http.Error(rw, fmt.Sprintf("Error parsing: %s", fileStat.LastMod), 500)
+		return
+	}
+
+	e := fileTemp.Execute(rw, struct {
+		FullDate string
+		ModDate  string
+		Stat     *stat.DocStat
+	}{
+		date.Format("Monday, 2 Jan 2006"),
+		date.Format(dateFormat),
+		fileStat,
+	})
+
+	if e != nil {
+		log.Println("Error in Temp", e)
+	}
+
 }
