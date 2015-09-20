@@ -25,6 +25,7 @@ const ()
 
 var (
 	addr         = flag.String("addr", "127.0.0.1:1667", "Web Address")
+	db           = flag.String("db", "_data.db", "Database")
 	staticFldr   = flag.String("static", "./static", "Static Folder")
 	templateFldr = flag.String("template", "./templates", "Templates Folder")
 	debug        = flag.Bool("debug", false, "show HTTP traffic")
@@ -76,7 +77,7 @@ func main() {
 
 	// Setup Database
 	log.Println("Setup Database")
-	db := database.OpenDB("_data.db")
+	db := database.OpenDB(*db)
 
 	// Get Identity
 	log.Println("Get Identity")
