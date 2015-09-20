@@ -44,6 +44,7 @@ type svgBox struct {
 
 type gPoint struct {
 	Stat  *stat.DailyStat
+	X, Y  int
 	Boxes []svgBox
 }
 
@@ -55,7 +56,6 @@ type SummaryHandle struct {
 	GridDayLines []int
 	GridWidth    int
 	GridHeight   int
-	GridHalf     int
 }
 
 func (sh *SummaryHandle) Setup() {
@@ -102,13 +102,12 @@ func (sh *SummaryHandle) Setup() {
 	sh.GridLines = []int{}
 	sh.GridWidth = 800
 	sh.GridHeight = 300
-	sh.GridHalf = sh.GridHeight
 	XStep := sh.GridWidth / 100
 
-	yH := sh.GridHalf
+	yH := sh.GridHeight
 	yStep := 100
 	for y := 0; yH > 0; y += yStep {
-		yH = sh.GridHalf - int(math.Pow(float64(y), 0.7))
+		yH = sh.GridHeight - int(math.Pow(float64(y), 0.7))
 		sh.GridLines = append(sh.GridLines, yH)
 
 		if y == 1000 {
@@ -127,20 +126,23 @@ func (sh *SummaryHandle) Setup() {
 
 	dailyWordHistChart("./static/days.png", 700, 400, dayList, dateList)
 
-	for i := 0; i < 100; i += 1 {
+	for i, day := range dateList {
+		d := sh.GetDayListDay(day)
 		if d != nil {
+			h := int(math.Pow(float64(d.WordAdd), 0.7))
+
 			p := gPoint{
+				X:     i * XStep,
+				Y:     sh.GridHeight - h,
 				Stat:  d,
 				Boxes: []svgBox{},
 			}
 
-			{
-				// Add Bar
-				h := int(math.Pow(float64(d.WordAdd), 0.7))
-				p.Boxes = append(p.Boxes, svgBox{X: i * XStep, Y: sh.GridHalf - h, W: XStep, H: h, Classname: "addBar"})
+			p.Boxes = append(p.Boxes, svgBox{X: i * XStep, Y: sh.GridHeight - h, W: XStep, H: h, Classname: "addBar"})
+			p.Boxes = append(p.Boxes, svgBox{X: i * XStep, Y: sh.GridHeight - h, W: XStep, H: int(math.Pow(float64(0-d.WordSub), 0.7)), Classname: "subBar"})
 
-				// Sub Bar
-				p.Boxes = append(p.Boxes, svgBox{X: i * XStep, Y: sh.GridHalf - h, W: XStep, H: int(math.Pow(float64(0-d.WordSub), 0.7)), Classname: "subBar"})
+			if p.Y < 0 {
+				p.Y = 30
 			}
 
 			sh.LatestGraph = append(sh.LatestGraph, p)
@@ -209,7 +211,7 @@ func (sh *SummaryHandle) SetDayListDay(dateKey time.Time, data *stat.DailyStat) 
 }
 
 func (sh SummaryHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	sumTemp, err := template.ParseFiles("summary.html")
+	sumTemp, err := template.ParseFiles("./templates/summary.html")
 	if err != nil {
 		log.Fatalln("Error parsing:", err)
 	}
@@ -217,10 +219,6 @@ func (sh SummaryHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if e != nil {
 		log.Println("Error in Temp", e)
 	}
-	/*
-		for dayStat := sh.db.LoadNextDailyStat(""); dayStat != nil; dayStat = sh.db.LoadNextDailyStat(dayStat.ModDate) {
-			fmt.Fprintf(rw, `<div><a href="/day/%s">%s</a> you wrote %d words and deleted %d words.</div>`, dayStat.ModDate, dayStat.ModDate, dayStat.WordAdd, dayStat.WordSub)
-		}*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -264,7 +262,7 @@ func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	sumTemp, err := template.ParseFiles("dailyStat.html")
+	sumTemp, err := template.ParseFiles("./templates/dailyStat.html")
 	if err != nil {
 		http.Error(rw, fmt.Sprintf("Error parsing: %s", err), 500)
 		return

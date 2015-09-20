@@ -124,15 +124,9 @@ svg .dayLine {
 
 <svg width="800px"  viewBox="0 0 {{.GridWidth}} {{.GridHeight}}">
 <rect x="0" y="0" width="{{.GridWidth}}" height="{{.GridHeight}}" style="fill:transparent; stroke:black; stroke-width:4px"  />
-
-<line x1="0" y1="{{.GridHalf}}" x2="{{.GridWidth}}" y2="{{.GridHalf}}" class="gridLine" />
-
 {{$g := .}}
 {{range .GridDayLines}}
 <line x1="{{.}}" y1="0" x2="{{.}}" y2="{{$g.GridHeight}}" class="dayLine" />
-{{end}}
-{{range .GridLines}}
-<line x1="0" y1="{{.}}" x2="{{$g.GridWidth}}" y2="{{.}}" class="dayLine" />
 {{end}}
 
 {{range .LatestGraph}}
@@ -140,9 +134,12 @@ svg .dayLine {
   {{range .Boxes}}
 	<rect x="{{.X}}" y="{{.Y}}" width="{{.W}}" height="{{.H}}" class="{{.Classname}}" />	
   {{end}}
+  <text x="{{.X}}" y="{{.Y}}">{{.Stat.WordAdd}}</text>
 </a>
 {{end}}
 </svg>
+
+<img src="./static/days.png" />
 
 <h3>Days Recorded</h3>
 

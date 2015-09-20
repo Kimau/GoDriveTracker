@@ -27,7 +27,7 @@ func MakeWebFace(addr string, static_root string, templatesFolder string) *WebFa
 		InMsg:  make(chan string),
 	}
 
-	wf.Router.Handle("/static/", http.FileServer(http.Dir(static_root)))
+	wf.Router.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(static_root))))
 
 	go wf.HostLoop()
 
@@ -49,6 +49,8 @@ func (wf *WebFace) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		wf.RedirectHandler(rw, req)
 		return
 	}
+
+	log.Println(req.URL)
 
 	wf.Router.ServeHTTP(rw, req)
 }
