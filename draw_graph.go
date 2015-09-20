@@ -3,15 +3,13 @@ package main
 import (
 	"image"
 	"image/color"
-	"image/draw"
 	"image/png"
 	"os"
 	"time"
 
 	"./stat"
-
-	"github.com/vdobler/chart"
-	"github.com/vdobler/chart/imgg"
+	"github.com/llgcode/draw2d/draw2dimg"
+	"github.com/llgcode/draw2d/draw2dkit"
 )
 
 type GraphImg struct {
@@ -30,8 +28,6 @@ func NewGraphImg(name string, w, h int) *GraphImg {
 	}
 
 	gImg.I = image.NewRGBA(image.Rect(0, 0, w, h))
-	bg := image.NewUniform(color.RGBA{0xff, 0xff, 0xff, 0xff})
-	draw.Draw(gImg.I, gImg.I.Bounds(), bg, image.ZP, draw.Src)
 
 	return &gImg
 }
@@ -41,76 +37,120 @@ func (d *GraphImg) Close() {
 	d.imgFile.Close()
 }
 
-func (d *GraphImg) Plot(c chart.Chart) {
-
-	igr := imgg.AddTo(d.I, 0, 0, d.W, d.H, color.RGBA{0xff, 0xff, 0xff, 0xff}, nil, nil)
-	c.Plot(igr)
-}
-
 //
 // Histograms Charts
 //
-func dailyWordHistChart(days []*stat.DailyStat, dateLine []time.Time) {
-	gImg := NewGraphImg("dayHist", 800, 300)
-	defer gImg.Close()
+func dailyWordHistChart(filename string, width, height int, days []*stat.DailyStat, dateLine []time.Time) {
 
-	hc := chart.BarChart{
-		Title:        "Last 100 Days",
-		SameBarWidth: true,
-		Stacked:      true,
-		Key: chart.Key{
-			Hide: true,
-		},
-	}
+	dest := image.NewRGBA(image.Rect(0, 0, width, height))
+	gc := draw2dimg.NewGraphicContext(dest)
 
-	green := chart.Style{Symbol: 'x', LineColor: color.NRGBA{0x00, 0xaa, 0x00, 0xff}, LineWidth: 0, FillColor: color.NRGBA{0x40, 0xff, 0x40, 0xff}}
-	red := chart.Style{Symbol: '%', LineColor: color.NRGBA{0xcc, 0x00, 0x00, 0xff}, LineWidth: 0, FillColor: color.NRGBA{0xff, 0x40, 0x40, 0xff}}
-
+	var minVal, maxVal float64 = 0, 0
 	dayLen := len(days)
+	xStep := float64(width) / float64(dayLen)
+	baseLineY := float64(50)
+
 	dayAdd := make([]float64, dayLen)
 	daySub := make([]float64, dayLen)
-	dateLineFlt := make([]float64, dayLen)
-
-	hc.XRange = chart.Range{
-		Label:      "Days",
-		Time:       false,
-		ShowLimits: false,
-		ShowZero:   false,
-		MinMode:    chart.RangeMode{Fixed: true, Constrained: true, Expand: chart.ExpandTight, Value: float64(-dayLen)},
-		MaxMode:    chart.RangeMode{Fixed: true, Constrained: true, Expand: chart.ExpandTight, Value: 0},
-		DataMin:    float64(dateLine[0].Unix()),
-		DataMax:    float64(dateLine[dayLen-1].Unix()),
-		TicSetting: chart.TicSetting{
-			Hide: true,
-		},
-	}
-
-	hc.YRange = chart.Range{
-		Label:      "",
-		ShowLimits: false,
-		ShowZero:   true,
-		Category:   []string{"Add", "Sub"},
-		TicSetting: chart.TicSetting{
-			Hide: true,
-		},
-	}
 
 	for i := 0; i < dayLen; i += 1 {
-		dateLineFlt[i] = float64(i - dayLen)
 		if days[i] == nil {
 			dayAdd[i] = 0
 			daySub[i] = 0
 		} else {
 			dayAdd[i] = float64(days[i].WordAdd)
-			daySub[i] = float64(days[i].WordSub)
+			daySub[i] = float64(0 - days[i].WordSub)
+
+			if dayAdd[i] > maxVal {
+				maxVal = dayAdd[i]
+			}
+			if daySub[i] > minVal {
+				minVal = daySub[i]
+			}
 		}
 	}
-	dayAdd[0] = 1000
-	dayAdd[dayLen-1] = 1000
-	daySub[0] = -1000
-	daySub[dayLen-1] = -1000
 
-	hc.AddDataPair("Add", dateLineFlt, dayAdd, green)
-	hc.AddDataPair("Sub", dateLineFlt, daySub, red)
-	gImg.Plot(&hc)
+	hf := float64(height)
+	wf := float64(width)
+
+	for i := 0; i < dayLen; i += 1 {
+		dayAdd[i] = (hf - baseLineY) * dayAdd[i] / maxVal
+		daySub[i] = (baseLineY) * daySub[i] / minVal
+	}
+
+	// Draw Grid Lines
+	{
+		gc.SetStrokeColor(color.RGBA{0x00, 0x00, 0x00, 0xff})
+		gc.SetLineWidth(0.2)
+
+		yStep := 100.0
+		if maxVal > 10000 {
+			yStep = 1000.0
+		} else if maxVal > 1000 {
+			yStep = 250.0
+		}
+
+		for y := yStep; y < maxVal; y += yStep {
+			yf := (hf - baseLineY) * y / maxVal
+			gc.MoveTo(0, yf)
+			gc.LineTo(wf, yf)
+		}
+
+		yStep = 100.0
+		if minVal > 10000 {
+			yStep = 1000.0
+		} else if minVal > 1000 {
+			yStep = 250.0
+		}
+
+		for y := yStep; y < minVal; y += yStep {
+			yf := (hf - baseLineY) + baseLineY*y/minVal
+			gc.MoveTo(0, yf)
+			gc.LineTo(wf, yf)
+		}
+
+		gc.Stroke()
+	}
+
+	// Set some properties
+	gc.SetFillColor(color.RGBA{0x44, 0xff, 0x44, 0xff})
+	for i := 0; i < dayLen; i += 1 {
+		x := float64(i) * xStep
+		draw2dkit.Rectangle(gc, x, hf-baseLineY, x+xStep, hf-baseLineY-dayAdd[i])
+	}
+	gc.Fill()
+
+	// Set some properties
+	gc.SetFillColor(color.RGBA{0xff, 0x44, 0x44, 0xff})
+	gc.FillString("BOO")
+	gc.FillStringAt("TEST", 100, 100)
+	for i := 0; i < dayLen; i += 1 {
+		x := float64(i) * xStep
+		draw2dkit.Rectangle(gc, x, hf-baseLineY, x+xStep, hf-baseLineY+daySub[i])
+	}
+	gc.Fill()
+
+	// Draw Base Line
+	{
+		gc.SetStrokeColor(color.RGBA{0x00, 0x00, 0x00, 0xff})
+		gc.SetLineWidth(1)
+		gc.MoveTo(0, 0)
+		gc.LineTo(0, hf)
+		gc.MoveTo(0, hf-baseLineY)
+		gc.LineTo(wf, hf-baseLineY)
+		gc.MoveTo(wf, 0)
+		gc.LineTo(wf, hf)
+
+		for i := 0; i < dayLen; i += 1 {
+			if dateLine[i].Weekday() == time.Monday {
+				x := float64(i) * xStep
+				gc.MoveTo(x, hf-baseLineY-10)
+				gc.LineTo(x, hf-baseLineY+10)
+			}
+		}
+
+		gc.Stroke()
+	}
+
+	draw2dimg.SaveToPngFile(filename, dest)
 }

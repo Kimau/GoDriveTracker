@@ -125,7 +125,7 @@ func (sh *SummaryHandle) Setup() {
 		newDate = newDate.AddDate(0, 0, 1)
 	}
 
-	dailyWordHistChart(dayList, dateList)
+	dailyWordHistChart("./static/days.png", 700, 400, dayList, dateList)
 
 	for i := 0; i < 100; i += 1 {
 		if d != nil {
