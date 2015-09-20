@@ -19,13 +19,18 @@
 <h3>Added <span class="add">{{.Stat.WordAdd}}</span> words</h3>
 <h3>Deleted <span class="sub">{{.Stat.WordSub}}</span> words</h3>
 
+{{.Stat.FileRevs}}
+
+{{$root := .}}
+
 <h3>Files Changed</h3>
 {{range $index, $doc := .DocList}}
   <li>{{$doc.Title}} 
-    {{with index .RevList $index}}
+    {{with index $root.RevList $index}}
+    {{.RevId}}
     <span>{{.UserName}}</span>
     <span>{{.WordCount}}</span>
-    <span>{{.ModDate}}</span>
+    <span>{{.GetTime}}</span>
     <div>{{range .WordFreq}}<span style="font-size:{{.Count}}pt">{{.Word}}</span> {{end}}</div>
     {{end}}
   </li>

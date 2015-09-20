@@ -16,7 +16,8 @@ import (
 )
 
 var (
-	rePathMatch = regexp.MustCompile("/day/([0-9]+)[/\\-]([0-9]+)[/\\-]([0-9]+)")
+	reDayPathMatch  = regexp.MustCompile("/day/([0-9]+)[/\\-]([0-9]+)[/\\-]([0-9]+)")
+	reFilePathMatch = regexp.MustCompile("/file/([^/]+)")
 )
 
 const (
@@ -27,8 +28,8 @@ func SetupWebFace(wf *web.WebFace, dbPtr *database.StatTrackerDB) {
 	sh := SummaryHandle{db: dbPtr}
 	sh.Setup()
 	wf.Router.Handle("/", sh)
-
 	wf.Router.Handle("/day/", DayHandle{db: dbPtr})
+	wf.Router.Handle("/file/", FileHandle{db: dbPtr})
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -95,7 +96,7 @@ func (sh *SummaryHandle) Setup() {
 
 	// Graph Setup
 	sh.LatestGraph = []gPoint{}
-	newDate = newDate.AddDate(0, 0, -100)
+	firstDay := newDate.AddDate(0, 0, -100)
 
 	sh.GridDayLines = []int{}
 	sh.GridLines = []int{}
@@ -115,8 +116,18 @@ func (sh *SummaryHandle) Setup() {
 		}
 	}
 
+	newDate = firstDay
+	dateList := make([]time.Time, 100)
+	dayList := make([]*stat.DailyStat, 100)
 	for i := 0; i < 100; i += 1 {
-		d := sh.GetDayListDay(newDate)
+		dateList[i] = newDate
+		dayList[i] = sh.GetDayListDay(newDate)
+		newDate = newDate.AddDate(0, 0, 1)
+	}
+
+	dailyWordHistChart(dayList, dateList)
+
+	for i := 0; i < 100; i += 1 {
 		if d != nil {
 			p := gPoint{
 				Stat:  d,
@@ -135,11 +146,9 @@ func (sh *SummaryHandle) Setup() {
 			sh.LatestGraph = append(sh.LatestGraph, p)
 		}
 
-		if newDate.Weekday() == time.Monday {
+		if dateList[i].Weekday() == time.Monday {
 			sh.GridDayLines = append(sh.GridDayLines, i*XStep)
 		}
-
-		newDate = newDate.AddDate(0, 0, 1)
 	}
 
 	fmt.Println("Setup Summary Handle")
@@ -230,7 +239,7 @@ type DayData struct {
 
 func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
-	matches := rePathMatch.FindAllStringSubmatch(req.URL.String(), -1)
+	matches := reDayPathMatch.FindAllStringSubmatch(req.URL.String(), -1)
 	if len(matches) < 1 {
 		http.Error(rw, "Invalid Path", 400)
 		return
@@ -241,7 +250,7 @@ func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	day, errDate := strconv.Atoi(matches[0][3])
 
 	if errYear != nil || errMonth != nil || errDate != nil {
-		http.Error(rw, "Error parsing Path", 400)
+		http.Error(rw, fmt.Sprintf("Error parsing Path: \n %s \n %s \n %s", errYear, errMonth, errDate), 400)
 		return
 	}
 
@@ -257,7 +266,8 @@ func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	sumTemp, err := template.ParseFiles("dailyStat.html")
 	if err != nil {
-		log.Fatalln("Error parsing:", err)
+		http.Error(rw, fmt.Sprintf("Error parsing: %s", err), 500)
+		return
 	}
 
 	dList := []*stat.DocStat{}
@@ -265,17 +275,19 @@ func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	for k, v := range dayStat.FileRevs {
 		file := dh.db.LoadFileStats(k)
 		if file == nil {
-			http.Error(rw, "Error finding file", 500)
-		} else {
+			http.Error(rw, fmt.Sprintf("Error finding file: %s", k), 500)
+			return
+		}
+
+		for _, vRev := range file.RevList {
 			for _, vRevID := range v {
-				dList = append(dList, file)
-				for _, vRev := range file.RevList {
-					if vRev.RevId == vRevID {
-						rList = append(rList, &vRev)
-					}
+				if vRev.RevId == vRevID {
+					dList = append(dList, file)
+					rList = append(rList, &vRev)
 				}
 			}
 		}
+
 	}
 
 	e := sumTemp.Execute(rw, DayData{
@@ -289,4 +301,28 @@ func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		log.Println("Error in Temp", e)
 	}
 
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// File Handle
+type FileHandle struct {
+	db *database.StatTrackerDB
+}
+
+func (dh FileHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+
+	matches := reFilePathMatch.FindAllStringSubmatch(req.URL.String(), -1)
+	if len(matches) < 1 {
+		fmt.Println(matches, req.URL)
+		http.Error(rw, "Invalid Path", 400)
+		return
+	}
+
+	fileStat := dh.db.LoadFileStats(matches[0][1])
+	if fileStat == nil {
+		fmt.Fprintf(rw, "No stats for %s", matches[0][1])
+		return
+	}
+
+	fmt.Fprint(rw, fileStat)
 }

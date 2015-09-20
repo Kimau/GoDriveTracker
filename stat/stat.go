@@ -1,7 +1,8 @@
 package stat
 
 import (
-	"log"
+	"fmt"
+	"time"
 	//	"encoding/json"
 )
 
@@ -48,54 +49,27 @@ type UserStat struct {
 	UserID     string `json:Id`
 }
 
-func (day *DailyStat) AddFile(newDoc *DocStat) {
-
-	revSubList, okFile := day.FileRevs[newDoc.FileId]
-
-	// Word Changes
-	prev := 0
-	for _, v := range newDoc.RevList {
-		shortDate := v.ModDate[:10]
-
-		if shortDate == day.ModDate {
-			diff := v.WordCount - prev
-			if diff >= 0 {
-				day.WordAdd = day.WordAdd + diff
-			} else {
-				day.WordSub = day.WordSub + diff
-			}
-
-			if !okFile {
-				day.FileRevs[newDoc.FileId] = []string{v.RevId}
-				okFile = true
-			} else {
-				day.FileRevs[newDoc.FileId] = append(revSubList, v.RevId)
-			}
-
-			break
-		}
-
-		prev = v.WordCount
-	}
+func (rev RevStat) GetTime() string {
+	x, _ := time.Parse("2006-01-02T15:04:05.000Z", rev.ModDate)
+	return x.Format("15:04")
 }
 
-func (day *DailyStat) AddDay(newDay *DailyStat) {
-	if day.ModDate != newDay.ModDate {
-		log.Fatalln("Dates must match", day.ModDate, newDay.ModDate)
-		return
+func (wp WordPair) String() string {
+	return fmt.Sprintf("%s:%d", wp.Word, wp.Count)
+}
+func (rev RevStat) String() string {
+	return fmt.Sprintf("[%s %s] %d words by %s. \n\t Words [%s]", rev.ModDate, rev.RevId, rev.WordCount, rev.UserName, rev.WordFreq)
+}
+func (doc DocStat) String() string {
+	s := fmt.Sprintf("[%s] '%s' last mod on %s with revs\n", doc.FileId, doc.Title, doc.LastMod)
+	for i, v := range doc.RevList {
+		s += fmt.Sprintf("\t %d:%s\n", i, v)
 	}
-
-	day.WordAdd += newDay.WordAdd
-	day.WordSub += newDay.WordSub
-
-	// File List
-	for fk, fv := range newDay.FileRevs {
-		revSubList, okFile := day.FileRevs[fk]
-		if !okFile {
-			day.FileRevs[fk] = fv
-		} else {
-			day.FileRevs[fk] = append(revSubList, fv...)
-		}
-	}
-
+	return s
+}
+func (day DailyStat) String() string {
+	return fmt.Sprintf("[%s] Words %d / %d with following edits { %s }", day.ModDate, day.WordAdd, day.WordSub, day.FileRevs)
+}
+func (usr *UserStat) String() string {
+	return fmt.Sprintf("[%s] %s last updated on %s (TOKEN HIDDEN)", usr.UserID, usr.Email, usr.UpdateDate)
 }
