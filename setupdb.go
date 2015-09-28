@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sort"
 
 	database "./database"
 	google "./google"
@@ -150,26 +149,14 @@ func RevisionPullCalc(rev *drive.Revision) stat.RevStat {
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(rBody.Body)
 	bodyStr := buf.String()
-	wCount, wTotal := stat.WordCount(bodyStr)
 
 	revStat := stat.RevStat{
-		RevId:     rev.Id,
-		UserName:  rev.LastModifyingUserName,
-		WordCount: wTotal,
-		ModDate:   rev.ModifiedDate,
-		WordFreq:  []stat.WordPair{},
+		RevId:    rev.Id,
+		UserName: rev.LastModifyingUserName,
+		ModDate:  rev.ModifiedDate,
 	}
 
-	if len(wCount) > 0 {
-		for k, v := range wCount {
-			revStat.WordFreq = append(revStat.WordFreq, stat.WordPair{Word: k, Count: v})
-		}
-		sort.Sort(stat.WordPairByVol(revStat.WordFreq))
-
-		if len(wCount) > 10 {
-			revStat.WordFreq = revStat.WordFreq[:10]
-		}
-	}
+	revStat.WordFreq, revStat.WordCount = stat.GetTopWords(bodyStr)
 
 	return revStat
 }

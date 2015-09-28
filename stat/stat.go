@@ -6,20 +6,6 @@ import (
 	//	"encoding/json"
 )
 
-// Sort by Modified Date and Type
-type WordPairByVol []WordPair
-
-func (a WordPairByVol) Len() int      { return len(a) }
-func (a WordPairByVol) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a WordPairByVol) Less(i, j int) bool {
-	return (a[i].Count > a[j].Count)
-}
-
-type WordPair struct {
-	Word  string `json:"Word"`
-	Count int    `json:"Count"`
-}
-
 type RevStat struct {
 	RevId     string     `json:"RevId"`
 	UserName  string     `json:"UserName"`
@@ -54,9 +40,6 @@ func (rev RevStat) GetTime() string {
 	return x.Format("15:04")
 }
 
-func (wp WordPair) String() string {
-	return fmt.Sprintf("%s:%d", wp.Word, wp.Count)
-}
 func (rev RevStat) String() string {
 	return fmt.Sprintf("[%s %s] %d words by %s. \n\t Words [%s]", rev.ModDate, rev.RevId, rev.WordCount, rev.UserName, rev.WordFreq)
 }
