@@ -19,7 +19,7 @@ func init() {
 //
 // Histograms Charts
 //
-func dailyWordHistChart(filename string, width, height int, days []*stat.DailyStat, dateLine []time.Time) {
+func dailyWordHistChart(filename string, width, height int, days []*stat.DailyUserStat, dateLine []time.Time) {
 
 	dest := image.NewRGBA(image.Rect(0, 0, width, height))
 	gc := draw2dimg.NewGraphicContext(dest)

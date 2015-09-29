@@ -281,7 +281,7 @@ func (st *StatTrackerDB) LoadFileStats(fileId string) *stat.DocStat {
 	return &result
 }
 
-func (st *StatTrackerDB) WriteDailyStats(day *stat.DailyStat) {
+func (st *StatTrackerDB) WriteDailyUserStats(day *stat.DailyUserStat) {
 	writeFunc := func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists(bucketDaily)
 		if err != nil {
@@ -311,8 +311,8 @@ func (st *StatTrackerDB) WriteDailyStats(day *stat.DailyStat) {
 	}
 }
 
-func (st *StatTrackerDB) LoadDailyStats(shortDate string) *stat.DailyStat {
-	var result stat.DailyStat
+func (st *StatTrackerDB) LoadDailyUserStats(shortDate string) *stat.DailyUserStat {
+	var result stat.DailyUserStat
 
 	loadFunc := func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(bucketDaily)
@@ -473,8 +473,8 @@ func (st *StatTrackerDB) LoadNextFileStat(fileId string) *stat.DocStat {
 	return &result
 }
 
-func (st *StatTrackerDB) LoadNextDailyStat(shortDate string) *stat.DailyStat {
-	var result stat.DailyStat
+func (st *StatTrackerDB) LoadNextDailyUserStat(shortDate string) *stat.DailyUserStat {
+	var result stat.DailyUserStat
 
 	seekKey := []byte(shortDate)
 

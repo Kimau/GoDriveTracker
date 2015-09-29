@@ -68,13 +68,6 @@ func main() {
 		fmt.Fprintf(rw, "Starting Server on %s", *addr)
 	}
 
-	// Login
-	log.Println("Login")
-	Tok, cErr := google.Login(wf, google.GetClientScope())
-	if cErr != nil {
-		log.Fatalln("Login Error:", cErr)
-	}
-
 	// Setup Database
 	log.Println("Setup Database")
 	db := database.OpenDB(*db)
@@ -85,6 +78,14 @@ func main() {
 
 	// First Time Load
 	if userStat == nil {
+
+		// Login
+		log.Println("Login")
+		Tok, cErr := google.Login(wf, google.GetClientScope())
+		if cErr != nil {
+			log.Fatalln("Login Error:", cErr)
+		}
+
 		log.Println("===== FRESH DATABSE SETUP =====")
 
 		iTok, iErr := google.GetIdentity(Tok)
@@ -107,6 +108,23 @@ func main() {
 
 		// Init DB
 		SetupDatabase(wf, db)
+	}
+
+	// REBUILD DEBUG
+	{
+
+		// Generate Daily Stat
+		docs := []*stat.DocStat{}
+		for f := db.LoadNextFileStat(""); f != nil; f = db.LoadNextFileStat(f.FileId) {
+			docs = append(docs, f)
+		}
+
+		dates := stat.CreateDailyUserStat(docs)
+
+		// Slower but good test (and get sorting from DB)
+		for _, v := range dates {
+			db.WriteDailyUserStats(&v)
+		}
 	}
 
 	log.Println("User", userStat.UserID, userStat.Email)

@@ -21,20 +21,6 @@ type DocStat struct {
 	RevList []RevStat `json:"RevList"`
 }
 
-type DailyStat struct {
-	WordAdd  int                 `json:"WordAdd"`
-	WordSub  int                 `json:"WordSub"`
-	ModDate  string              `json:"ModDate"`
-	FileRevs map[string][]string `json:"FileRevList"`
-}
-
-type UserStat struct {
-	UpdateDate string `json:"UpdateDate"`
-	Token      []byte `json:Token`
-	Email      string `json:Email`
-	UserID     string `json:Id`
-}
-
 func (rev RevStat) GetTime() string {
 	x, _ := time.Parse("2006-01-02T15:04:05.000Z", rev.ModDate)
 	return x.Format("15:04")
@@ -49,10 +35,4 @@ func (doc DocStat) String() string {
 		s += fmt.Sprintf("\t %d:%s\n", i, v)
 	}
 	return s
-}
-func (day DailyStat) String() string {
-	return fmt.Sprintf("[%s] Words %d / %d with following edits { %s }", day.ModDate, day.WordAdd, day.WordSub, day.FileRevs)
-}
-func (usr *UserStat) String() string {
-	return fmt.Sprintf("[%s] %s last updated on %s (TOKEN HIDDEN)", usr.UserID, usr.Email, usr.UpdateDate)
 }

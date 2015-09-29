@@ -44,14 +44,14 @@ type svgBox struct {
 }
 
 type gPoint struct {
-	Stat  *stat.DailyStat
+	Stat  *stat.DailyUserStat
 	X, Y  int
 	Boxes []svgBox
 }
 
 type SummaryHandle struct {
 	db           *database.StatTrackerDB
-	DayList      map[int]map[time.Month]map[int]*stat.DailyStat
+	DayList      map[int]map[time.Month]map[int]*stat.DailyUserStat
 	LatestGraph  []gPoint
 	GridLines    []int
 	GridDayLines []int
@@ -60,10 +60,10 @@ type SummaryHandle struct {
 }
 
 func (sh *SummaryHandle) Setup() {
-	sh.DayList = make(map[int]map[time.Month]map[int]*stat.DailyStat)
+	sh.DayList = make(map[int]map[time.Month]map[int]*stat.DailyUserStat)
 
 	// Sumary Setup
-	d := sh.db.LoadNextDailyStat("")
+	d := sh.db.LoadNextDailyUserStat("")
 	prevDate, dErr := time.Parse(dateFormat, d.ModDate)
 	if dErr != nil {
 		log.Fatalln("Cannot parse:", d)
@@ -86,7 +86,7 @@ func (sh *SummaryHandle) Setup() {
 		prevDate = prevDate.AddDate(0, 0, 1)
 
 		// Onto Next Date
-		d = sh.db.LoadNextDailyStat(d.ModDate)
+		d = sh.db.LoadNextDailyUserStat(d.ModDate)
 	}
 
 	newDate := time.Now()
@@ -118,7 +118,7 @@ func (sh *SummaryHandle) Setup() {
 
 	newDate = firstDay
 	dateList := make([]time.Time, 100)
-	dayList := make([]*stat.DailyStat, 100)
+	dayList := make([]*stat.DailyUserStat, 100)
 	for i := 0; i < 100; i += 1 {
 		dateList[i] = newDate
 		dayList[i] = sh.GetDayListDay(newDate)
@@ -157,10 +157,10 @@ func (sh *SummaryHandle) Setup() {
 	fmt.Println("Setup Summary Handle")
 }
 
-func (sh *SummaryHandle) GetDayListDay(dateKey time.Time) *stat.DailyStat {
+func (sh *SummaryHandle) GetDayListDay(dateKey time.Time) *stat.DailyUserStat {
 	var ok bool
-	var year map[time.Month]map[int]*stat.DailyStat
-	var month map[int]*stat.DailyStat
+	var year map[time.Month]map[int]*stat.DailyUserStat
+	var month map[int]*stat.DailyUserStat
 
 	yKey := -dateKey.Year()
 	year, ok = sh.DayList[yKey]
@@ -177,22 +177,22 @@ func (sh *SummaryHandle) GetDayListDay(dateKey time.Time) *stat.DailyStat {
 	return month[dateKey.Day()]
 }
 
-func (sh *SummaryHandle) SetDayListDay(dateKey time.Time, data *stat.DailyStat) {
+func (sh *SummaryHandle) SetDayListDay(dateKey time.Time, data *stat.DailyUserStat) {
 	var ok bool
-	var year map[time.Month]map[int]*stat.DailyStat
-	var month map[int]*stat.DailyStat
+	var year map[time.Month]map[int]*stat.DailyUserStat
+	var month map[int]*stat.DailyUserStat
 
 	yKey := -dateKey.Year()
 	year, ok = sh.DayList[yKey]
 	if !ok {
-		sh.DayList[yKey] = make(map[time.Month]map[int]*stat.DailyStat)
+		sh.DayList[yKey] = make(map[time.Month]map[int]*stat.DailyUserStat)
 		year = sh.DayList[yKey]
 	}
 
 	mKey := dateKey.Month()
 	month, ok = year[mKey]
 	if !ok {
-		year[mKey] = make(map[int]*stat.DailyStat)
+		year[mKey] = make(map[int]*stat.DailyUserStat)
 		month = year[mKey]
 
 		firstDay := time.Date(dateKey.Year(), dateKey.Month(), 1, 0, 0, 0, 0, time.UTC).Weekday()
@@ -230,7 +230,7 @@ type DayHandle struct {
 
 type DayData struct {
 	FullDate  string
-	Stat      *stat.DailyStat
+	Stat      *stat.DailyUserStat
 	WordTotal int
 	DocList   []*stat.DocStat
 	RevList   []*stat.RevStat
@@ -257,13 +257,13 @@ func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	shortDate := date.Format("2006-01-02")
 
-	dayStat := dh.db.LoadDailyStats(shortDate)
+	dayStat := dh.db.LoadDailyUserStats(shortDate)
 	if dayStat == nil {
 		fmt.Fprintf(rw, "No stats for %s", shortDate)
 		return
 	}
 
-	sumTemp, err := template.ParseFiles("./templates/dailyStat.html")
+	sumTemp, err := template.ParseFiles("./templates/DailyUserStat.html")
 	if err != nil {
 		http.Error(rw, fmt.Sprintf("Error parsing: %s", err), 500)
 		return
