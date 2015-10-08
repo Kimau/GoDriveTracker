@@ -263,7 +263,7 @@ func (dh DayHandle) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	sumTemp, err := template.ParseFiles("./templates/DailyUserStat.html")
+	sumTemp, err := template.ParseFiles("./templates/dailyStat.html")
 	if err != nil {
 		http.Error(rw, fmt.Sprintf("Error parsing: %s", err), 500)
 		return
