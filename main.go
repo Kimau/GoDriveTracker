@@ -21,8 +21,6 @@ import (
 
 type CommandFunc func() error
 
-const ()
-
 var (
 	addr         = flag.String("addr", "127.0.0.1:1667", "Web Address")
 	db           = flag.String("db", "_data.db", "Database")
@@ -187,7 +185,7 @@ func scanForInput() chan string {
 
 func listCommands() error {
 	commandOut := "Commands: "
-	for i, _ := range commandFuncs {
+	for i := range commandFuncs {
 		commandOut += i + ", "
 	}
 

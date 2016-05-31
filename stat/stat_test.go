@@ -2,8 +2,6 @@ package stat
 
 import "testing"
 
-var ()
-
 func TestWordCount(t *testing.T) {
 
 	td := []struct {

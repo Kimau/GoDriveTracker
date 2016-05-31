@@ -32,7 +32,7 @@ func Login(wf *web.WebFace, clientScopes []string) (*oauth2.Token, error) {
 	// X
 	secret, err := loadClientSecret("_secret.json")
 	if err != nil {
-		log.Fatalln("Secret Missing: %s", err)
+		log.Fatalln("Secret Missing:", err)
 		return nil, err
 	}
 
