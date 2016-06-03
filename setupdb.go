@@ -8,10 +8,11 @@ import (
 	"net/http"
 	"os"
 
-	database "./database"
-	google "./google"
-	stat "./stat"
-	web "./web"
+	database "GoDriveTracker/database"
+	google "GoDriveTracker/google"
+	stat "GoDriveTracker/stat"
+	web "GoDriveTracker/web"
+
 	drive "google.golang.org/api/drive/v2" // DO NOT LIKE THIS! Want to encapse this in google package
 )
 

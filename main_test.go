@@ -15,9 +15,6 @@ func TestImage(t *testing.T) {
 	DrawTest()
 }
 
-
-
-
 func DrawTest() {
 	// Initialize the graphic context on an RGBA image
 	dest := image.NewRGBA(image.Rect(0, 0, 297, 210.0))

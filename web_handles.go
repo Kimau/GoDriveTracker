@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"time"
 
-	"./database"
-	"./stat"
-	"./web"
+	"GoDriveTracker/database"
+	"GoDriveTracker/stat"
+	"GoDriveTracker/web"
 )
 
 var (

@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	database "./database"
-	google "./google"
-	stat "./stat"
-	web "./web"
+	database "GoDriveTracker/database"
+	google "GoDriveTracker/google"
+	stat "GoDriveTracker/stat"
+	web "GoDriveTracker/web"
 )
 
 type CommandFunc func() error

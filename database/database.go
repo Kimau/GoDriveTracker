@@ -8,7 +8,8 @@ import (
 
 	"github.com/boltdb/bolt"
 
-	stat "../stat"
+	stat "GoDriveTracker/stat"
+
 	drive "google.golang.org/api/drive/v2" // DO NOT LIKE THIS! Want to encapse this in google package
 )
 
