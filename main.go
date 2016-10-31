@@ -96,6 +96,12 @@ func main() {
 	log.Println("User", userStat.UserID, userStat.Email)
 	wf.RedirectHandler = nil
 
+	// Gather
+	gatherDocsChangedOnDate(1)
+	gatherDocsChangedOnDate(2)
+	gatherDocsChangedOnDate(3)
+	gatherDocsChangedOnDate(4)
+
 	// Running Loop
 	log.Println("Running Loop")
 	commandLoop()
@@ -112,8 +118,9 @@ func commandLoop() {
 		select {
 		case line := <-lines:
 			line = strings.ToLower(line)
+			toks := strings.Split(line, " ")
 
-			valFunc, ok := commandFuncs[line]
+			valFunc, ok := commandFuncs[toks[0]]
 			if ok {
 				err := valFunc()
 
@@ -163,7 +170,7 @@ func listActivity() error {
 	}
 
 	fmt.Println("== Activity ==")
-	for _, a := range aList {
+	for _, a := range aList.Activities {
 		fmt.Println("----")
 		for _, e := range a.SingleEvents {
 			fmt.Println(e.User.Name, e.PrimaryEventType, e.Target.MimeType, e.Target.Name)
@@ -171,5 +178,84 @@ func listActivity() error {
 	}
 
 	fmt.Println("==============")
+	return nil
+}
+
+func gatherDocsChangedOnDate(daysAgo uint) error {
+	aResp, err := google.ListActivities(20)
+	if err != nil {
+		return err
+	}
+
+	aList := aResp.Activities
+
+	n := time.Now()
+	startTime := time.Date(n.Year(), n.Month(), n.Day()-(int)(daysAgo), 0, 0, 0, 0, time.UTC)
+	endTime := time.Date(n.Year(), n.Month(), n.Day()-(int)(daysAgo)+1, 0, 0, 0, 0, time.UTC)
+
+	lastTimeStamp := time.Unix((int64)(aList[len(aList)-1].CombinedEvent.EventTimeMillis/1000), 0)
+
+	fmt.Println("Fetching activity from ", startTime.String(), " to ", endTime.String())
+
+	// Time
+	pageCounter := 0
+	if lastTimeStamp.After(startTime) {
+		pageCounter += 1
+		aResp, err = google.NextPage(20, aResp)
+
+		aList = append(aList, aResp.Activities...)
+	}
+
+	// Gather Docs changed
+	docsChanged := make(map[string]string)
+	for _, a := range aList {
+		for _, e := range a.SingleEvents {
+			if e.Target.MimeType != google.MimeDoc {
+				continue
+			}
+
+			ts := time.Unix((int64)(e.EventTimeMillis/1000), 0)
+			if ts.After(endTime) || ts.Before(startTime) {
+				continue
+			}
+
+			_, ok := docsChanged[e.Target.Id]
+			if ok {
+				continue
+			}
+
+			docsChanged[e.Target.Id] = e.Target.Name
+			fmt.Println(e.User.Name, e.PrimaryEventType, e.Target.MimeType, e.Target.Name)
+		}
+	}
+
+	// Gather Revisions
+	for k, v := range docsChanged {
+		rList, err := google.AllRevisions(k)
+		if err != nil {
+			return err
+		}
+
+		firstRev := rList[0]
+		lastRev := rList[len(rList)-1]
+		ft, _ := time.Parse(google.TimeFMT, firstRev.ModifiedTime)
+		lt, _ := time.Parse(google.TimeFMT, lastRev.ModifiedTime)
+
+		for _, r := range rList {
+			dt, _ := time.Parse(google.TimeFMT, r.ModifiedTime)
+			if dt.Before(startTime) && dt.After(ft) {
+				firstRev = r
+				ft = dt
+			}
+
+			if dt.After(endTime) && dt.Before(lt) {
+				firstRev = r
+				ft = dt
+			}
+		}
+
+		fmt.Println(v, ft, lt)
+	}
+
 	return nil
 }

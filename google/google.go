@@ -18,6 +18,10 @@ var (
 	driveThrottle <-chan time.Time
 )
 
+const (
+	TimeFMT string = "2006-01-02T15:04:05.000Z"
+)
+
 func init() {
 	rate := time.Second / 10
 	driveThrottle = time.Tick(rate)

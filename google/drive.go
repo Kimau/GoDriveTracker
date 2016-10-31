@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	mimeDoc string = "application/vnd.google-apps.document"
+	MimeDoc string = "application/vnd.google-apps.document"
 )
 
 // AllRevisions fetches all revisions for a given file
@@ -18,7 +18,8 @@ func AllRevisions(fileId string) ([]*drive.Revision, error) {
 		fmt.Printf("An error occurred: %v\n", err)
 		return nil, err
 	}
-	return r.Items, nil
+
+	return r.Revisions, nil
 }
 
 // AllFiles fetches and displays all files
@@ -45,7 +46,7 @@ func AllFiles(query string, pageNum chan int) ([]*drive.File, error) {
 			fmt.Printf("An error occurred: %v\n", err)
 			return fs, err
 		}
-		fs = append(fs, r.Items...)
+		fs = append(fs, r.Files...)
 		pageToken = r.NextPageToken
 		if pageToken == "" {
 			break
