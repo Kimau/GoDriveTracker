@@ -20,6 +20,16 @@ import (
 
 type CommandFunc func() error
 
+type DocRevStruct struct {
+	Name        string
+	PrevId      string
+	PrevModTime time.Time
+	PrevBody    []byte
+	NextId      string
+	NextModTime time.Time
+	NextBody    []byte
+}
+
 var (
 	addr         = flag.String("addr", "127.0.0.1:1667", "Web Address")
 	staticFldr   = flag.String("static", "./static", "Static Folder")
@@ -182,22 +192,22 @@ func listActivity() error {
 }
 
 func gatherDocsChangedOnDate(daysAgo uint) error {
+	// Get Recent Activity
 	aResp, err := google.ListActivities(20)
 	if err != nil {
 		return err
 	}
-
 	aList := aResp.Activities
 
+	// Setup Time Window
 	n := time.Now()
 	startTime := time.Date(n.Year(), n.Month(), n.Day()-(int)(daysAgo), 0, 0, 0, 0, time.UTC)
 	endTime := time.Date(n.Year(), n.Month(), n.Day()-(int)(daysAgo)+1, 0, 0, 0, 0, time.UTC)
-
 	lastTimeStamp := time.Unix((int64)(aList[len(aList)-1].CombinedEvent.EventTimeMillis/1000), 0)
 
 	fmt.Println("Fetching activity from ", startTime.String(), " to ", endTime.String())
 
-	// Time
+	// Get pages until we cover the time frame
 	pageCounter := 0
 	if lastTimeStamp.After(startTime) {
 		pageCounter += 1
@@ -207,7 +217,9 @@ func gatherDocsChangedOnDate(daysAgo uint) error {
 	}
 
 	// Gather Docs changed
-	docsChanged := make(map[string]string)
+	docsChanged := make(map[string]DocRevStruct)
+
+	// Check we have at least some activity in time frame
 	for _, a := range aList {
 		for _, e := range a.SingleEvents {
 			if e.Target.MimeType != google.MimeDoc {
@@ -224,7 +236,7 @@ func gatherDocsChangedOnDate(daysAgo uint) error {
 				continue
 			}
 
-			docsChanged[e.Target.Id] = e.Target.Name
+			docsChanged[e.Target.Id] = DocRevStruct{Name: e.Target.Name}
 			fmt.Println(e.User.Name, e.PrimaryEventType, e.Target.MimeType, e.Target.Name)
 		}
 	}
@@ -236,25 +248,49 @@ func gatherDocsChangedOnDate(daysAgo uint) error {
 			return err
 		}
 
-		firstRev := rList[0]
-		lastRev := rList[len(rList)-1]
-		ft, _ := time.Parse(google.TimeFMT, firstRev.ModifiedTime)
-		lt, _ := time.Parse(google.TimeFMT, lastRev.ModifiedTime)
+		v.PrevId = rList[0].Id
+		v.NextId = rList[len(rList)-1].Id
 
+		v.PrevModTime, err = time.Parse(google.TimeFMT, rList[0].ModifiedTime)
+		if err != nil {
+			return err
+		}
+
+		v.NextModTime, err = time.Parse(google.TimeFMT, rList[len(rList)-1].ModifiedTime)
+		if err != nil {
+			return err
+		}
+
+		// Find Last Rev before Time frame and Last Rev in Timeframe
 		for _, r := range rList {
-			dt, _ := time.Parse(google.TimeFMT, r.ModifiedTime)
-			if dt.Before(startTime) && dt.After(ft) {
-				firstRev = r
-				ft = dt
+			dt, err := time.Parse(google.TimeFMT, r.ModifiedTime)
+			if err != nil {
+				return err
+			}
+			if dt.Before(startTime) && dt.After(v.PrevModTime) {
+				v.PrevId = r.Id
+				v.PrevModTime = dt
 			}
 
-			if dt.After(endTime) && dt.Before(lt) {
-				firstRev = r
-				ft = dt
+			if dt.Before(endTime) && dt.After(v.NextModTime) {
+				v.NextId = r.Id
+				v.NextModTime = dt
 			}
 		}
 
-		fmt.Println(v, ft, lt)
+		fmt.Println(v.Name, "\t", v.PrevModTime, "\t", v.NextModTime)
+
+		// Get Body of Files
+		v.PrevBody, err = google.DownloadFileRev(k, v.PrevId)
+		if err != nil {
+			return err
+		}
+
+		v.NextBody, err = google.DownloadFileRev(k, v.NextId)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	return nil

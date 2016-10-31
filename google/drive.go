@@ -2,6 +2,7 @@ package google
 
 import (
 	"fmt"
+	"io/ioutil"
 
 	drive "google.golang.org/api/drive/v3"
 )
@@ -55,4 +56,18 @@ func AllFiles(query string, pageNum chan int) ([]*drive.File, error) {
 
 	pageNum <- -1
 	return fs, nil
+}
+
+func DownloadFileRev(fileId string, revId string) ([]byte, error) {
+	r, err := loginClient.Get(fmt.Sprintf("https://www.googleapis.com/drive/v3/files/%s/revisions/%s", fileId, revId))
+	if err != nil {
+		return nil, err
+	}
+
+	body, rErr := ioutil.ReadAll(r.Body)
+	if rErr != nil {
+		return nil, rErr
+	}
+
+	return body, nil
 }
