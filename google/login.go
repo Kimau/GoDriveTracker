@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"GoDriveTracker/web"
+	"../web"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"

@@ -6,7 +6,7 @@ import (
 	"image/color"
 	"time"
 
-	"GoDriveTracker/stat"
+	"./stat"
 
 	"github.com/llgcode/draw2d"
 	"github.com/llgcode/draw2d/draw2dimg"

@@ -3,7 +3,7 @@ package google
 import (
 	"fmt"
 
-	drive "google.golang.org/api/drive/v2"
+	drive "google.golang.org/api/drive/v3"
 )
 
 const (

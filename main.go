@@ -13,25 +13,25 @@ import (
 	"strings"
 	"time"
 
-	database "GoDriveTracker/database"
-	google "GoDriveTracker/google"
-	stat "GoDriveTracker/stat"
-	web "GoDriveTracker/web"
+	google "./google"
+	stat "./stat"
+	web "./web"
 )
 
 type CommandFunc func() error
 
 var (
 	addr         = flag.String("addr", "127.0.0.1:1667", "Web Address")
-	db           = flag.String("db", "_data.db", "Database")
 	staticFldr   = flag.String("static", "./static", "Static Folder")
 	templateFldr = flag.String("template", "./templates", "Templates Folder")
 	debug        = flag.Bool("debug", false, "show HTTP traffic")
 	commandFuncs = make(map[string]CommandFunc)
+	userStat     *stat.UserStat
 )
 
 func init() {
 	commandFuncs["help"] = listCommands
+	commandFuncs["activity"] = listActivity
 
 	switch runtime.GOOS {
 	case "windows":
@@ -66,25 +66,14 @@ func main() {
 		fmt.Fprintf(rw, "Starting Server on %s", *addr)
 	}
 
-	// Setup Database
-	log.Println("Setup Database")
-	db := database.OpenDB(*db)
-
 	// Get Identity
-	log.Println("Get Identity")
-	userStat := db.LoadNextUser("")
-
-	// First Time Load
-	if userStat == nil {
-
+	{
 		// Login
 		log.Println("Login")
 		Tok, cErr := google.Login(wf, google.GetClientScope())
 		if cErr != nil {
 			log.Fatalln("Login Error:", cErr)
 		}
-
-		log.Println("===== FRESH DATABSE SETUP =====")
 
 		iTok, iErr := google.GetIdentity(Tok)
 		if iErr != nil {
@@ -101,35 +90,10 @@ func main() {
 			UserID:     iTok.UserId,
 		}
 
-		// Get & Write DB
-		db.WriteUserStats(userStat)
-
-		// Init DB
-		SetupDatabase(wf, db)
-	}
-
-	// REBUILD DEBUG
-	{
-
-		// Generate Daily Stat
-		docs := []*stat.DocStat{}
-		for f := db.LoadNextFileStat(""); f != nil; f = db.LoadNextFileStat(f.FileId) {
-			docs = append(docs, f)
-		}
-
-		dates := stat.CreateDailyUserStat(docs)
-
-		// Slower but good test (and get sorting from DB)
-		for _, v := range dates {
-			db.WriteDailyUserStats(&v)
-		}
+		// TODO :: Save User
 	}
 
 	log.Println("User", userStat.UserID, userStat.Email)
-
-	// Setup Webface with Database
-	log.Println("Setup Webface with Database")
-	SetupWebFace(wf, db)
 	wf.RedirectHandler = nil
 
 	// Running Loop
@@ -138,7 +102,6 @@ func main() {
 
 	// Clean up
 	log.Println("Clean up")
-	db.CloseDB()
 }
 
 func commandLoop() {
@@ -190,5 +153,23 @@ func listCommands() error {
 	}
 
 	fmt.Println(commandOut)
+	return nil
+}
+
+func listActivity() error {
+	aList, err := google.ListActivities(20)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("== Activity ==")
+	for _, a := range aList {
+		fmt.Println("----")
+		for _, e := range a.SingleEvents {
+			fmt.Println(e.User.Name, e.PrimaryEventType, e.Target.MimeType, e.Target.Name)
+		}
+	}
+
+	fmt.Println("==============")
 	return nil
 }

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	activity "google.golang.org/api/appsactivity/v1"
-	drive "google.golang.org/api/drive/v2"
+	drive "google.golang.org/api/drive/v3"
 	oauth "google.golang.org/api/oauth2/v2"
 )
 
@@ -46,7 +46,7 @@ func setupClients(client *http.Client) {
 		log.Fatalf("Unable to create Drive service: %v", err)
 	}
 
-	actSvc, err = appsactivity.New(client)
+	actSvc, err = activity.New(client)
 	if err != nil {
 		log.Fatalf("Unable to retrieve appsactivity Client %v", err)
 	}

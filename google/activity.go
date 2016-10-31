@@ -1,14 +1,12 @@
 package google
 
 import (
-	"fmt"
-
 	activity "google.golang.org/api/appsactivity/v1"
-	drive "google.golang.org/api/drive/v2"
+	//drive "google.golang.org/api/drive/v2"
 )
 
 // AllRevisions fetches all revisions for a given file
-func ListActivities(reqPageSize int) ([]*activity.Activity, error) {
+func ListActivities(reqPageSize int64) ([]*activity.Activity, error) {
 	<-driveThrottle // rate Limit
 
 	r, err := actSvc.Activities.List().Source("drive.google.com").
@@ -17,5 +15,5 @@ func ListActivities(reqPageSize int) ([]*activity.Activity, error) {
 		return nil, err
 	}
 
-	return r, nil
+	return r.Activities, nil
 }
