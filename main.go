@@ -24,10 +24,10 @@ type DocRevStruct struct {
 	Name        string
 	PrevId      string
 	PrevModTime time.Time
-	PrevBody    []byte
+	PrevBody    string
 	NextId      string
 	NextModTime time.Time
-	NextBody    []byte
+	NextBody    string
 }
 
 var (
@@ -281,16 +281,27 @@ func gatherDocsChangedOnDate(daysAgo uint) error {
 		fmt.Println(v.Name, "\t", v.PrevModTime, "\t", v.NextModTime)
 
 		// Get Body of Files
-		v.PrevBody, err = google.DownloadFileRev(k, v.PrevId)
+		var ba []byte
+		ba, err = google.DownloadFileRev(k, v.PrevId)
 		if err != nil {
 			return err
 		}
+		v.PrevBody = string(ba)
 
-		v.NextBody, err = google.DownloadFileRev(k, v.NextId)
+		ba, err = google.DownloadFileRev(k, v.NextId)
 		if err != nil {
 			return err
 		}
+		v.NextBody = string(ba)
 
+		fmt.Println("BOOOOM")
+		fmt.Println(v.NextBody)
+		return nil
+
+		wpPrev, wc1 := stat.GetTopWords(v.PrevBody)
+		wpNext, wc2 := stat.GetTopWords(v.NextBody)
+
+		fmt.Println(v.Name, ":\t", wc1, " - ", wc2, "\n\t", wpPrev, "\n\t", wpNext)
 	}
 
 	return nil
