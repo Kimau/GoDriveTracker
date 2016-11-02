@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -21,13 +22,9 @@ import (
 type CommandFunc func() error
 
 type DocRevStruct struct {
-	Name        string
-	PrevId      string
-	PrevModTime time.Time
-	PrevBody    string
-	NextId      string
-	NextModTime time.Time
-	NextBody    string
+	Name string
+	Prev *google.RevBody
+	Next *google.RevBody
 }
 
 var (
@@ -107,10 +104,44 @@ func main() {
 	wf.RedirectHandler = nil
 
 	// Gather
-	gatherDocsChangedOnDate(1)
-	gatherDocsChangedOnDate(2)
-	gatherDocsChangedOnDate(3)
-	gatherDocsChangedOnDate(4)
+	var err error
+	var wc int
+	var sc []*stat.CountStat
+	sc, wc, err = gatherDocsChangedOnDate(1)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Words: ", wc)
+	for _, v := range sc {
+		fmt.Println("\t", v)
+	}
+
+	sc, wc, err = gatherDocsChangedOnDate(2)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Words: ", wc)
+	for _, v := range sc {
+		fmt.Println("\t", v)
+	}
+
+	sc, wc, err = gatherDocsChangedOnDate(5)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Words: ", wc)
+	for _, v := range sc {
+		fmt.Println("\t", v)
+	}
+
+	sc, wc, err = gatherDocsChangedOnDate(6)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Words: ", wc)
+	for _, v := range sc {
+		fmt.Println("\t", v)
+	}
 
 	// Running Loop
 	log.Println("Running Loop")
@@ -191,11 +222,11 @@ func listActivity() error {
 	return nil
 }
 
-func gatherDocsChangedOnDate(daysAgo uint) error {
+func gatherDocsChangedOnDate(daysAgo uint) ([]*stat.CountStat, int, error) {
 	// Get Recent Activity
 	aResp, err := google.ListActivities(20)
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
 	aList := aResp.Activities
 
@@ -237,72 +268,78 @@ func gatherDocsChangedOnDate(daysAgo uint) error {
 			}
 
 			docsChanged[e.Target.Id] = DocRevStruct{Name: e.Target.Name}
-			fmt.Println(e.User.Name, e.PrimaryEventType, e.Target.MimeType, e.Target.Name)
+			// fmt.Println(e.User.Name, e.PrimaryEventType, e.Target.MimeType, e.Target.Name)
 		}
 	}
+
+	totalWC := 0
+	var wordCounts []*stat.CountStat
 
 	// Gather Revisions
 	for k, v := range docsChanged {
 		rList, err := google.AllRevisions(k)
 		if err != nil {
-			return err
+			return nil, 0, err
 		}
 
-		v.PrevId = rList[0].Id
-		v.NextId = rList[len(rList)-1].Id
+		// fmt.Println(len(rList), rList[0].ModifiedDate, rList[len(rList)-1].ModifiedDate)
 
-		v.PrevModTime, err = time.Parse(google.TimeFMT, rList[0].ModifiedTime)
-		if err != nil {
-			return err
-		}
-
-		v.NextModTime, err = time.Parse(google.TimeFMT, rList[len(rList)-1].ModifiedTime)
-		if err != nil {
-			return err
-		}
+		v.Prev = nil
+		v.Next = nil
 
 		// Find Last Rev before Time frame and Last Rev in Timeframe
 		for _, r := range rList {
-			dt, err := time.Parse(google.TimeFMT, r.ModifiedTime)
+			dt, err := time.Parse(google.TimeFMT, r.ModifiedDate)
 			if err != nil {
-				return err
+				return nil, 0, err
 			}
-			if dt.Before(startTime) && dt.After(v.PrevModTime) {
-				v.PrevId = r.Id
-				v.PrevModTime = dt
+			// fmt.Println(r.ModifiedDate, "\t", dt.Before(startTime), dt.After(startTime) && dt.Before(endTime), dt.After(endTime))
+
+			if dt.Before(startTime) && (v.Prev == nil || dt.After(v.Prev.ModTime)) {
+				v.Prev = &google.RevBody{Rev: r, ModTime: dt}
 			}
 
-			if dt.Before(endTime) && dt.After(v.NextModTime) {
-				v.NextId = r.Id
-				v.NextModTime = dt
+			if dt.Before(endTime) && (v.Next == nil || dt.After(v.Next.ModTime)) {
+				v.Next = &google.RevBody{Rev: r, ModTime: dt}
 			}
 		}
 
-		fmt.Println(v.Name, "\t", v.PrevModTime, "\t", v.NextModTime)
+		if v.Next == nil {
+			return nil, 0, errors.New(fmt.Sprintf("%s : Unable to find revision [%s]", v.Name, k))
+		}
 
 		// Get Body of Files
-		var ba []byte
-		ba, err = google.DownloadFileRev(k, v.PrevId)
-		if err != nil {
-			return err
+		var wc1 int
+		if v.Prev == nil {
+			v.Prev = &google.RevBody{Rev: nil, ModTime: startTime, Body: ""}
+			wc1 = 0
+		} else {
+			v.Prev.Body, err = google.ExportRev(v.Prev.Rev)
+			if err != nil {
+				return nil, 0, err
+			}
+
+			_, wc1 = stat.GetTopWords(v.Prev.Body)
 		}
-		v.PrevBody = string(ba)
 
-		ba, err = google.DownloadFileRev(k, v.NextId)
+		v.Next.Body, err = google.ExportRev(v.Next.Rev)
 		if err != nil {
-			return err
+			return nil, 0, err
 		}
-		v.NextBody = string(ba)
+		wordCloud, wc2 := stat.GetTopWords(v.Next.Body)
 
-		fmt.Println("BOOOOM")
-		fmt.Println(v.NextBody)
-		return nil
+		wordCounts = append(wordCounts, &stat.CountStat{
+			Name:      v.Name,
+			WordCount: wc2 - wc1,
+			WordFreq:  wordCloud,
+		})
 
-		wpPrev, wc1 := stat.GetTopWords(v.PrevBody)
-		wpNext, wc2 := stat.GetTopWords(v.NextBody)
+		if wc2 > wc1 {
+			totalWC += wc2 - wc1
+		}
 
-		fmt.Println(v.Name, ":\t", wc1, " - ", wc2, "\n\t", wpPrev, "\n\t", wpNext)
+		// fmt.Println(v.Name, ":\t", wc1, " - ", wc2, "\n\t", v.Prev.ModTime, "\t", v.Next.ModTime, "\n", wordCloud)
 	}
 
-	return nil
+	return wordCounts, totalWC, nil
 }

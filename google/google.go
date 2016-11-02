@@ -6,7 +6,7 @@ import (
 	"time"
 
 	activity "google.golang.org/api/appsactivity/v1"
-	drive "google.golang.org/api/drive/v3"
+	drive "google.golang.org/api/drive/v2"
 	oauth "google.golang.org/api/oauth2/v2"
 )
 

@@ -3,13 +3,20 @@ package google
 import (
 	"fmt"
 	"io/ioutil"
+	"time"
 
-	drive "google.golang.org/api/drive/v3"
+	drive "google.golang.org/api/drive/v2"
 )
 
 const (
 	MimeDoc string = "application/vnd.google-apps.document"
 )
+
+type RevBody struct {
+	Rev     *drive.Revision
+	ModTime time.Time
+	Body    string
+}
 
 // AllRevisions fetches all revisions for a given file
 func AllRevisions(fileId string) ([]*drive.Revision, error) {
@@ -20,7 +27,7 @@ func AllRevisions(fileId string) ([]*drive.Revision, error) {
 		return nil, err
 	}
 
-	return r.Revisions, nil
+	return r.Items, nil
 }
 
 // AllFiles fetches and displays all files
@@ -47,7 +54,7 @@ func AllFiles(query string, pageNum chan int) ([]*drive.File, error) {
 			fmt.Printf("An error occurred: %v\n", err)
 			return fs, err
 		}
-		fs = append(fs, r.Files...)
+		fs = append(fs, r.Items...)
 		pageToken = r.NextPageToken
 		if pageToken == "" {
 			break
@@ -59,7 +66,9 @@ func AllFiles(query string, pageNum chan int) ([]*drive.File, error) {
 }
 
 func DownloadFileRev(fileId string, revId string) ([]byte, error) {
-	r, err := loginClient.Get(fmt.Sprintf("https://www.googleapis.com/drive/v3/files/%s/revisions/%s", fileId, revId))
+	<-driveThrottle // rate Limit
+	r, err := loginClient.Get(fmt.Sprintf("https://www.googleapis.com/drive/v3/files/%s/revisions/%s/", fileId, revId))
+
 	if err != nil {
 		return nil, err
 	}
@@ -70,4 +79,20 @@ func DownloadFileRev(fileId string, revId string) ([]byte, error) {
 	}
 
 	return body, nil
+}
+
+func ExportRev(rev *drive.Revision) (string, error) {
+	<-driveThrottle // rate Limit
+	var ba []byte
+	r, err := GetAuth(rev.ExportLinks["text/plain"])
+	if err != nil {
+		return "", err
+	}
+
+	ba, err = ioutil.ReadAll(r.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(ba), nil
 }

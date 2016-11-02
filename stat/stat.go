@@ -21,6 +21,12 @@ type DocStat struct {
 	RevList []RevStat `json:"RevList"`
 }
 
+type CountStat struct {
+	Name      string
+	WordCount int
+	WordFreq  []WordPair
+}
+
 func (rev RevStat) GetTime() string {
 	x, _ := time.Parse("2006-01-02T15:04:05.000Z", rev.ModDate)
 	return x.Format("15:04")
@@ -35,4 +41,8 @@ func (doc DocStat) String() string {
 		s += fmt.Sprintf("\t %d:%s\n", i, v)
 	}
 	return s
+}
+
+func (cs CountStat) String() string {
+	return fmt.Sprintf("%s: %d", cs.Name, cs.WordCount)
 }
